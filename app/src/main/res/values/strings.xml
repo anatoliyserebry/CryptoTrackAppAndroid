@@ -9,6 +9,8 @@
     <string name="demo_login">You can use any email and password for the demo.</string>
     <string name="market">Market</string>
     <string name="favorites">Favorites</string>
+    <string name="portfolio">Portfolio</string>
+    <string name="converter">Converter</string>
     <string name="notifications">Notifications</string>
     <string name="search_hint">Search crypto</string>
     <string name="empty_market">No data yet. Check the server, choose another API, or refresh again.</string>
@@ -22,4 +24,19 @@
     <string name="loading_market_data">Loading market data...</string>
     <string name="market_cap">Market cap</string>
     <string name="volume_24h">24h volume</string>
+    <string name="portfolio_total">Valeur totale</string>
+    <string name="portfolio_24h">Variation 24h</string>
+    <string name="portfolio_positions">Positions</string>
+    <string name="portfolio_add">Ajouter / modifier une position</string>
+    <string name="portfolio_crypto">Crypto</string>
+    <string name="portfolio_quantity">Quantite</string>
+    <string name="save_position">Enregistrer</string>
+    <string name="remove_position">Supprimer</string>
+    <string name="portfolio_empty">Ajoutez une quantite pour suivre votre portefeuille.</string>
+    <string name="converter_amount">Montant</string>
+    <string name="converter_from">De</string>
+    <string name="converter_to">Vers</string>
+    <string name="converter_result">Resultat</string>
+    <string name="converter_rate">Taux indicatif</string>
+    <string name="swap_currencies">Inverser</string>
 </resources>

@@ -3,7 +3,10 @@ package com.example.cryptotrackappandroid.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import java.util.LinkedHashMap;
 import java.util.HashSet;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class SessionManager {
@@ -12,6 +15,7 @@ public class SessionManager {
     private static final String KEY_FAVORITES = "favorites";
     private static final String KEY_NOTIFICATIONS = "notifications_enabled";
     private static final String KEY_API_SOURCE = "api_source";
+    private static final String KEY_PORTFOLIO = "portfolio_holdings";
 
     private final SharedPreferences preferences;
 
@@ -64,5 +68,63 @@ public class SessionManager {
 
     public void setApiSource(ApiSource source) {
         preferences.edit().putString(KEY_API_SOURCE, source != null ? source.getKey() : ApiSource.AUTO.getKey()).apply();
+    }
+
+    public Map<String, Double> getPortfolioHoldings() {
+        Set<String> entries = preferences.getStringSet(KEY_PORTFOLIO, new HashSet<>());
+        Map<String, Double> holdings = new LinkedHashMap<>();
+        for (String entry : entries) {
+            if (entry == null) {
+                continue;
+            }
+            String[] parts = entry.split(":", 2);
+            if (parts.length != 2) {
+                continue;
+            }
+            String symbol = normalizeSymbol(parts[0]);
+            if (symbol.isEmpty()) {
+                continue;
+            }
+            try {
+                double amount = Double.parseDouble(parts[1]);
+                if (amount > 0.0) {
+                    holdings.put(symbol, amount);
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return holdings;
+    }
+
+    public void setPortfolioHolding(String symbol, double amount) {
+        Map<String, Double> holdings = getPortfolioHoldings();
+        String cleanSymbol = normalizeSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return;
+        }
+        if (amount > 0.0) {
+            holdings.put(cleanSymbol, amount);
+        } else {
+            holdings.remove(cleanSymbol);
+        }
+        savePortfolioHoldings(holdings);
+    }
+
+    public void removePortfolioHolding(String symbol) {
+        setPortfolioHolding(symbol, 0.0);
+    }
+
+    private void savePortfolioHoldings(Map<String, Double> holdings) {
+        Set<String> entries = new HashSet<>();
+        for (Map.Entry<String, Double> entry : holdings.entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null && entry.getValue() > 0.0) {
+                entries.add(normalizeSymbol(entry.getKey()) + ":" + entry.getValue());
+            }
+        }
+        preferences.edit().putStringSet(KEY_PORTFOLIO, entries).apply();
+    }
+
+    private String normalizeSymbol(String symbol) {
+        return symbol == null ? "" : symbol.trim().toUpperCase(Locale.US);
     }
 }

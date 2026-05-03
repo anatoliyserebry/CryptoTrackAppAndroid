@@ -8,4 +8,12 @@
         android:id="@+id/nav_favorites"
         android:icon="@drawable/ic_star_24"
         android:title="@string/favorites" />
+    <item
+        android:id="@+id/nav_portfolio"
+        android:icon="@drawable/ic_account_balance_wallet_24"
+        android:title="@string/portfolio" />
+    <item
+        android:id="@+id/nav_converter"
+        android:icon="@drawable/ic_currency_exchange_24"
+        android:title="@string/converter" />
 </menu>

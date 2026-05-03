@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -37,15 +38,24 @@ public class ApiClient {
     private static final String BYBIT_TICKERS_URL = BYBIT_BASE_URL + "/v5/market/tickers?category=spot";
     private static final String MEXC_BASE_URL = "https://api.mexc.com";
     private static final String MEXC_TICKERS_URL = MEXC_BASE_URL + "/api/v3/ticker/24hr";
+    private static final String BINANCE_BASE_URL = "https://api.binance.com";
+    private static final String BINANCE_TICKERS_URL = BINANCE_BASE_URL
+            + "/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22,%22ETHUSDT%22,%22SOLUSDT%22,%22BNBUSDT%22,%22XRPUSDT%22,"
+            + "%22ADAUSDT%22,%22DOGEUSDT%22,%22AVAXUSDT%22,%22DOTUSDT%22,%22LINKUSDT%22%5D";
+    private static final String KRAKEN_BASE_URL = "https://api.kraken.com";
+    private static final String KRAKEN_TICKERS_URL = KRAKEN_BASE_URL
+            + "/0/public/Ticker?pair=XBTUSD,ETHUSD,SOLUSD,BNBUSD,XRPUSD,ADAUSD,DOGEUSD,AVAXUSD,DOTUSD,LINKUSD";
     private static final String COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
     private static final String COINGECKO_MARKETS_URL = COINGECKO_BASE_URL
             + "/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,binancecoin,ripple,cardano,dogecoin,avalanche-2,polkadot,chainlink"
             + "&order=market_cap_desc&per_page=20&page=1&sparkline=true&price_change_percentage=24h,7d,30d";
+    private static final String FIAT_RATES_URL = "https://api.frankfurter.app/latest?from=USD&to=EUR,GBP,JPY,CHF,CAD,AUD";
     private static final Set<String> TRACKED_USDT_SYMBOLS = new HashSet<>(Arrays.asList(
             "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
             "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT"
     ));
     private static final Map<String, String> COINGECKO_IDS_BY_SYMBOL = new HashMap<>();
+    private static final Map<String, String> KRAKEN_PAIRS_BY_SYMBOL = new HashMap<>();
     private static final String[] CURRENCY_ENDPOINTS = {
             "/cryptocurrencies",
             "/api/cryptocurrencies",
@@ -63,6 +73,17 @@ public class ApiClient {
         COINGECKO_IDS_BY_SYMBOL.put("AVAX", "avalanche-2");
         COINGECKO_IDS_BY_SYMBOL.put("DOT", "polkadot");
         COINGECKO_IDS_BY_SYMBOL.put("LINK", "chainlink");
+
+        KRAKEN_PAIRS_BY_SYMBOL.put("BTC", "XBTUSD");
+        KRAKEN_PAIRS_BY_SYMBOL.put("ETH", "ETHUSD");
+        KRAKEN_PAIRS_BY_SYMBOL.put("SOL", "SOLUSD");
+        KRAKEN_PAIRS_BY_SYMBOL.put("BNB", "BNBUSD");
+        KRAKEN_PAIRS_BY_SYMBOL.put("XRP", "XRPUSD");
+        KRAKEN_PAIRS_BY_SYMBOL.put("ADA", "ADAUSD");
+        KRAKEN_PAIRS_BY_SYMBOL.put("DOGE", "DOGEUSD");
+        KRAKEN_PAIRS_BY_SYMBOL.put("AVAX", "AVAXUSD");
+        KRAKEN_PAIRS_BY_SYMBOL.put("DOT", "DOTUSD");
+        KRAKEN_PAIRS_BY_SYMBOL.put("LINK", "LINKUSD");
     }
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -177,9 +198,42 @@ public class ApiClient {
         });
     }
 
+    public void fetchFiatRates(ApiCallback<Map<String, Double>> callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject root = new JSONObject(requestAbsolute("GET", FIAT_RATES_URL, null, null));
+                JSONObject ratesObject = root.optJSONObject("rates");
+                Map<String, Double> rates = new LinkedHashMap<>();
+                rates.put("USD", 1.0);
+                if (ratesObject != null) {
+                    String[] codes = {"EUR", "GBP", "JPY", "CHF", "CAD", "AUD"};
+                    for (String code : codes) {
+                        double rate = ratesObject.optDouble(code, Double.NaN);
+                        if (!Double.isNaN(rate) && rate > 0.0) {
+                            rates.put(code, rate);
+                        }
+                    }
+                }
+                if (rates.size() <= 1) {
+                    throw new IOException("No fiat rates");
+                }
+                postSuccess(callback, rates);
+            } catch (Exception error) {
+                postError(callback, error);
+            }
+        });
+    }
+
     private List<ApiSource> currencySources() {
         if (source == ApiSource.AUTO) {
-            return Arrays.asList(ApiSource.FASTAPI, ApiSource.COINGECKO, ApiSource.BYBIT, ApiSource.MEXC);
+            return Arrays.asList(
+                    ApiSource.FASTAPI,
+                    ApiSource.COINGECKO,
+                    ApiSource.BYBIT,
+                    ApiSource.MEXC,
+                    ApiSource.BINANCE,
+                    ApiSource.KRAKEN
+            );
         }
         return Collections.singletonList(source);
     }
@@ -197,6 +251,8 @@ public class ApiClient {
         ordered.add(ApiSource.COINGECKO);
         ordered.add(ApiSource.BYBIT);
         ordered.add(ApiSource.MEXC);
+        ordered.add(ApiSource.BINANCE);
+        ordered.add(ApiSource.KRAKEN);
         ordered.add(ApiSource.FASTAPI);
         return new ArrayList<>(ordered);
     }
@@ -211,6 +267,10 @@ public class ApiClient {
                 return parseBybitCurrencies(requestAbsolute("GET", BYBIT_TICKERS_URL, null, null));
             case MEXC:
                 return parseMexcCurrencies(requestAbsolute("GET", MEXC_TICKERS_URL, null, null));
+            case BINANCE:
+                return parseBinanceCurrencies(requestAbsolute("GET", BINANCE_TICKERS_URL, null, null));
+            case KRAKEN:
+                return parseKrakenCurrencies(requestAbsolute("GET", KRAKEN_TICKERS_URL, null, null));
             case AUTO:
             default:
                 return new ArrayList<>();
@@ -232,6 +292,10 @@ public class ApiClient {
                 return fetchBybitChart(currency, range);
             case MEXC:
                 return fetchMexcChart(currency, range);
+            case BINANCE:
+                return fetchBinanceChart(currency, range);
+            case KRAKEN:
+                return fetchKrakenChart(currency, range);
             case AUTO:
             default:
                 throw new IOException("Unsupported chart source");
@@ -320,6 +384,38 @@ public class ApiClient {
         JSONArray list = new JSONArray(requestAbsolute("GET", url, null, null));
         List<Point> points = parseKlineArray(list, 0, 4);
         return pointsToSeries(points, range, ApiSource.MEXC, ApiSource.MEXC.getDisplayName(), false);
+    }
+
+    private ChartSeries fetchBinanceChart(CryptoCurrency currency, ChartRange range) throws Exception {
+        long end = System.currentTimeMillis();
+        long start = end - range.durationMillis();
+        String symbol = tradingPair(currency);
+        String url = BINANCE_BASE_URL
+                + "/api/v3/klines?symbol=" + encodeQuery(symbol)
+                + "&interval=" + encodeQuery(range.getMexcInterval())
+                + "&startTime=" + start
+                + "&endTime=" + end
+                + "&limit=" + range.getLimit();
+        JSONArray list = new JSONArray(requestAbsolute("GET", url, null, null));
+        List<Point> points = parseKlineArray(list, 0, 4);
+        return pointsToSeries(points, range, ApiSource.BINANCE, ApiSource.BINANCE.getDisplayName(), false);
+    }
+
+    private ChartSeries fetchKrakenChart(CryptoCurrency currency, ChartRange range) throws Exception {
+        long start = (System.currentTimeMillis() - range.durationMillis()) / 1000L;
+        String url = KRAKEN_BASE_URL
+                + "/0/public/OHLC?pair=" + encodeQuery(krakenPair(currency))
+                + "&interval=" + krakenInterval(range)
+                + "&since=" + start;
+        JSONObject root = new JSONObject(requestAbsolute("GET", url, null, null));
+        JSONArray errors = root.optJSONArray("error");
+        if (errors != null && errors.length() > 0) {
+            throw new IOException("Kraken error: " + errors.toString());
+        }
+        JSONObject result = root.optJSONObject("result");
+        JSONArray list = firstResultArray(result);
+        List<Point> points = parseKlineArray(list, 0, 4);
+        return pointsToSeries(points, range, ApiSource.KRAKEN, ApiSource.KRAKEN.getDisplayName(), false);
     }
 
     private List<CryptoCurrency> parseServerCurrencies(String response) throws Exception {
@@ -489,6 +585,102 @@ public class ApiClient {
                     syntheticHistory(price, change),
                     false,
                     ApiSource.MEXC.getDisplayName()
+            ));
+        }
+        return currencies;
+    }
+
+    private List<CryptoCurrency> parseBinanceCurrencies(String response) throws Exception {
+        Object root = new JSONTokener(response).nextValue();
+        JSONArray list;
+        if (root instanceof JSONArray) {
+            list = (JSONArray) root;
+        } else if (root instanceof JSONObject) {
+            list = new JSONArray();
+            list.put(root);
+        } else {
+            list = new JSONArray();
+        }
+
+        List<CryptoCurrency> currencies = new ArrayList<>();
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject item = list.optJSONObject(i);
+            if (item == null) {
+                continue;
+            }
+            String pair = item.optString("symbol", "");
+            if (!TRACKED_USDT_SYMBOLS.contains(pair)) {
+                continue;
+            }
+
+            String base = pair.replace("USDT", "");
+            double price = parseDouble(item.optString("lastPrice", "0"));
+            double change = parseDouble(item.optString("priceChangePercent", "0"));
+            double quoteVolume = parseDouble(item.optString("quoteVolume", "0"));
+            double volume = quoteVolume > 0.0
+                    ? quoteVolume
+                    : parseDouble(item.optString("volume", "0")) * price;
+
+            currencies.add(new CryptoCurrency(
+                    "binance-" + base.toLowerCase(Locale.US),
+                    base,
+                    displayName(base),
+                    price,
+                    change,
+                    0.0,
+                    volume,
+                    syntheticHistory(price, change),
+                    false,
+                    ApiSource.BINANCE.getDisplayName()
+            ));
+        }
+        return currencies;
+    }
+
+    private List<CryptoCurrency> parseKrakenCurrencies(String response) throws Exception {
+        JSONObject root = new JSONObject(response);
+        JSONArray errors = root.optJSONArray("error");
+        if (errors != null && errors.length() > 0) {
+            throw new IOException("Kraken error: " + errors.toString());
+        }
+
+        JSONObject result = root.optJSONObject("result");
+        List<CryptoCurrency> currencies = new ArrayList<>();
+        if (result == null) {
+            return currencies;
+        }
+
+        JSONArray keys = result.names();
+        if (keys == null) {
+            return currencies;
+        }
+
+        for (int i = 0; i < keys.length(); i++) {
+            String pairKey = keys.optString(i);
+            JSONObject item = result.optJSONObject(pairKey);
+            String base = krakenSymbolFromPairKey(pairKey);
+            if (item == null || base == null) {
+                continue;
+            }
+
+            JSONArray close = item.optJSONArray("c");
+            JSONArray volume = item.optJSONArray("v");
+            double price = close != null ? parseDoubleValue(close.opt(0)) : 0.0;
+            double open = parseDoubleValue(item.opt("o"));
+            double change = open > 0.0 ? ((price - open) / open) * 100.0 : 0.0;
+            double baseVolume = volume != null ? parseDoubleValue(volume.opt(1)) : 0.0;
+
+            currencies.add(new CryptoCurrency(
+                    "kraken-" + base.toLowerCase(Locale.US),
+                    base,
+                    displayName(base),
+                    price,
+                    change,
+                    0.0,
+                    baseVolume * price,
+                    syntheticHistory(price, change),
+                    false,
+                    ApiSource.KRAKEN.getDisplayName()
             ));
         }
         return currencies;
@@ -714,6 +906,27 @@ public class ApiClient {
         return new JSONArray();
     }
 
+    private JSONArray firstResultArray(JSONObject object) {
+        if (object == null) {
+            return new JSONArray();
+        }
+        JSONArray names = object.names();
+        if (names == null) {
+            return new JSONArray();
+        }
+        for (int i = 0; i < names.length(); i++) {
+            String key = names.optString(i);
+            if ("last".equalsIgnoreCase(key)) {
+                continue;
+            }
+            JSONArray array = object.optJSONArray(key);
+            if (array != null) {
+                return array;
+            }
+        }
+        return new JSONArray();
+    }
+
     private String firstString(JSONObject object, String... keys) {
         for (String key : keys) {
             String value = object.optString(key, null);
@@ -815,6 +1028,42 @@ public class ApiClient {
         String symbol = currency != null ? currency.getSymbol() : "BTC";
         String upper = symbol.toUpperCase(Locale.US);
         return upper.endsWith("USDT") ? upper : upper + "USDT";
+    }
+
+    private String krakenPair(CryptoCurrency currency) {
+        String symbol = currency != null ? currency.getSymbol() : "BTC";
+        String upper = symbol.toUpperCase(Locale.US);
+        String pair = KRAKEN_PAIRS_BY_SYMBOL.get(upper);
+        return pair != null ? pair : upper + "USD";
+    }
+
+    private int krakenInterval(ChartRange range) {
+        if (range == ChartRange.DAY) {
+            return 15;
+        }
+        if (range == ChartRange.MONTH) {
+            return 240;
+        }
+        return 60;
+    }
+
+    private String krakenSymbolFromPairKey(String pairKey) {
+        if (pairKey == null) {
+            return null;
+        }
+        String upper = pairKey.toUpperCase(Locale.US);
+        if (upper.contains("XBT")) {
+            return "BTC";
+        }
+        if (upper.contains("XDG")) {
+            return "DOGE";
+        }
+        for (String symbol : KRAKEN_PAIRS_BY_SYMBOL.keySet()) {
+            if (upper.contains(symbol)) {
+                return symbol;
+            }
+        }
+        return null;
     }
 
     private String displayName(String base) {

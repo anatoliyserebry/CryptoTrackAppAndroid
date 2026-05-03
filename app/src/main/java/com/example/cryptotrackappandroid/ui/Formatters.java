@@ -38,6 +38,41 @@ public final class Formatters {
         return price(value);
     }
 
+    public static String fiat(double value, String code) {
+        String cleanCode = code == null || code.trim().isEmpty() ? "USD" : code.trim().toUpperCase(Locale.US);
+        double abs = Math.abs(value);
+        if ("USD".equals(cleanCode)) {
+            return price(value);
+        }
+        if ("JPY".equals(cleanCode)) {
+            return String.format(Locale.US, "%s %,.0f", cleanCode, value);
+        }
+        if (abs >= 1.0) {
+            return String.format(Locale.US, "%s %,.2f", cleanCode, value);
+        }
+        if (abs >= 0.01) {
+            return String.format(Locale.US, "%s %.4f", cleanCode, value);
+        }
+        return String.format(Locale.US, "%s %.8f", cleanCode, value);
+    }
+
+    public static String cryptoAmount(double value, String symbol) {
+        String cleanSymbol = symbol == null || symbol.trim().isEmpty() ? "CRYPTO" : symbol.trim().toUpperCase(Locale.US);
+        double abs = Math.abs(value);
+        if (abs >= 1.0) {
+            return String.format(Locale.US, "%,.6f %s", value, cleanSymbol);
+        }
+        return String.format(Locale.US, "%.8f %s", value, cleanSymbol);
+    }
+
+    public static String quantity(double value) {
+        double abs = Math.abs(value);
+        if (abs >= 1.0) {
+            return String.format(Locale.US, "%,.6f", value);
+        }
+        return String.format(Locale.US, "%.8f", value);
+    }
+
     public static String change(double value) {
         return String.format(Locale.US, "%s%.2f%%", value >= 0 ? "+" : "", value);
     }

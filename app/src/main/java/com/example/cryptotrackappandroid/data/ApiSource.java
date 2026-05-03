@@ -7,7 +7,9 @@ public enum ApiSource {
     FASTAPI("fastapi", "FastAPI"),
     COINGECKO("coingecko", "CoinGecko"),
     BYBIT("bybit", "Bybit"),
-    MEXC("mexc", "MEXC");
+    MEXC("mexc", "MEXC"),
+    BINANCE("binance", "Binance"),
+    KRAKEN("kraken", "Kraken");
 
     private final String key;
     private final String displayName;
@@ -71,6 +73,12 @@ public enum ApiSource {
         }
         if (normalized.contains("mexc")) {
             return MEXC;
+        }
+        if (normalized.contains("binance")) {
+            return BINANCE;
+        }
+        if (normalized.contains("kraken")) {
+            return KRAKEN;
         }
         if (normalized.contains("fastapi")) {
             return FASTAPI;
