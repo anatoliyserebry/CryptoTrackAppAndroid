@@ -51,6 +51,6 @@ public final class Formatters {
     }
 
     public static String updatedNow() {
-        return "Обновлено " + new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+        return "Updated at " + new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
     }
 }

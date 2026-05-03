@@ -8,8 +8,11 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -22,6 +25,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.cryptotrackappandroid.R;
 import com.example.cryptotrackappandroid.data.ApiCallback;
 import com.example.cryptotrackappandroid.data.ApiClient;
+import com.example.cryptotrackappandroid.data.ApiSource;
 import com.example.cryptotrackappandroid.data.CryptoCurrency;
 import com.example.cryptotrackappandroid.data.SessionManager;
 import com.example.cryptotrackappandroid.notifications.NotificationHelper;
@@ -45,6 +49,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
 
     private SessionManager sessionManager;
     private ApiClient apiClient;
+    private ApiSource currentApiSource = ApiSource.AUTO;
     private CryptoAdapter adapter;
     private ProgressBar progressBar;
     private TextView emptyText;
@@ -53,6 +58,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     private TextView favoriteCountText;
     private TextInputEditText searchInput;
     private SwitchMaterial notificationSwitch;
+    private Spinner apiSourceSpinner;
     private boolean showingFavorites = false;
 
     @Override
@@ -67,7 +73,8 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         }
 
         NotificationHelper.createChannel(this);
-        apiClient = new ApiClient();
+        currentApiSource = sessionManager.getApiSource();
+        apiClient = new ApiClient(currentApiSource);
         setContentView(R.layout.activity_main);
         bindViews();
         setupList();
@@ -92,6 +99,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         favoriteCountText = findViewById(R.id.favoriteCountText);
         searchInput = findViewById(R.id.searchInput);
         notificationSwitch = findViewById(R.id.notificationSwitch);
+        apiSourceSpinner = findViewById(R.id.apiSourceSpinner);
         notificationSwitch.setChecked(sessionManager.areNotificationsEnabled());
     }
 
@@ -103,6 +111,8 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     }
 
     private void setupActions() {
+        setupApiSourceSpinner();
+
         ImageButton refreshButton = findViewById(R.id.refreshButton);
         refreshButton.setOnClickListener(v -> loadCurrencies(false));
 
@@ -136,7 +146,39 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
             }
             sessionManager.setNotificationsEnabled(isChecked);
             if (isChecked) {
-                Snackbar.make(notificationSwitch, "Уведомления включены", Snackbar.LENGTH_SHORT).show();
+                Snackbar.make(notificationSwitch, "Notifications enabled", Snackbar.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void setupApiSourceSpinner() {
+        ArrayAdapter<String> sourceAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                ApiSource.displayNames()
+        );
+        sourceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        apiSourceSpinner.setAdapter(sourceAdapter);
+        apiSourceSpinner.setSelection(currentApiSource.ordinal(), false);
+        apiSourceSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                ApiSource selectedSource = ApiSource.values()[position];
+                if (selectedSource == currentApiSource) {
+                    return;
+                }
+                currentApiSource = selectedSource;
+                sessionManager.setApiSource(selectedSource);
+                apiClient = new ApiClient(selectedSource);
+                allCurrencies.clear();
+                lastPrices.clear();
+                filterAndRender();
+                loadCurrencies(true);
+                Snackbar.make(apiSourceSpinner, "API: " + selectedSource.getDisplayName(), Snackbar.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
             }
         });
     }
@@ -157,7 +199,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 maybeNotifyMarketMoves(result);
                 allCurrencies.clear();
                 allCurrencies.addAll(result);
-                updatedAtText.setText(Formatters.updatedNow());
+                updatedAtText.setText(Formatters.updatedNow() + " - " + loadedSourceLabel(result));
                 filterAndRender();
             }
 
@@ -166,7 +208,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 progressBar.setVisibility(View.GONE);
                 emptyText.setText(R.string.empty_market);
                 emptyText.setVisibility(View.VISIBLE);
-                Snackbar.make(emptyText, "Не удалось получить данные", Snackbar.LENGTH_LONG).show();
+                Snackbar.make(emptyText, "Unable to fetch market data", Snackbar.LENGTH_LONG).show();
             }
         });
     }
@@ -223,8 +265,18 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 favoriteCount++;
             }
         }
-        marketCountText.setText(allCurrencies.size() + " активов");
-        favoriteCountText.setText(favoriteCount + " в избранном");
+        marketCountText.setText(allCurrencies.size() + (allCurrencies.size() > 1 ? " actifs" : " actif"));
+        favoriteCountText.setText(favoriteCount + (favoriteCount == 1 ? " favorite" : " favorites"));
+    }
+
+    private String loadedSourceLabel(List<CryptoCurrency> currencies) {
+        if (currentApiSource != ApiSource.AUTO) {
+            return currentApiSource.getDisplayName();
+        }
+        if (currencies != null && !currencies.isEmpty()) {
+            return currencies.get(0).getSource();
+        }
+        return ApiSource.AUTO.getDisplayName();
     }
 
     @Override
@@ -249,7 +301,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
             }
         });
         filterAndRender();
-        Snackbar.make(emptyText, favorite ? "Добавлено в избранное" : "Удалено из избранного", Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(emptyText, favorite ? "Added to favorites" : "Removed from favorites", Snackbar.LENGTH_SHORT).show();
     }
 
     @Override
@@ -261,6 +313,6 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
         sessionManager.setNotificationsEnabled(granted);
         notificationSwitch.setChecked(granted);
-        Snackbar.make(notificationSwitch, granted ? "Уведомления включены" : "Разрешение на уведомления не выдано", Snackbar.LENGTH_LONG).show();
+        Snackbar.make(notificationSwitch, granted ? "Notifications enabled" : "Notification permission denied", Snackbar.LENGTH_LONG).show();
     }
 }

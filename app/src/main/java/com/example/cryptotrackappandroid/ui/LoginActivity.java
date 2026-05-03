@@ -60,7 +60,7 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onError(Exception error) {
                 setLoading(false);
-                Snackbar.make(loginButton, "Введите email и пароль", Snackbar.LENGTH_LONG).show();
+                Snackbar.make(loginButton, "Enter an email and password", Snackbar.LENGTH_LONG).show();
             }
         });
     }

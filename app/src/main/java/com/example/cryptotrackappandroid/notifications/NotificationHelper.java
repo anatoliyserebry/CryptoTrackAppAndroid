@@ -60,7 +60,7 @@ public final class NotificationHelper {
         );
 
         String title = currency.getSymbol() + " " + Formatters.change(movePercent);
-        String text = currency.getName() + " сейчас " + Formatters.price(currency.getPriceUsd());
+        String text = currency.getName() + " is now " + Formatters.price(currency.getPriceUsd());
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_bell_24)
                 .setContentTitle(title)

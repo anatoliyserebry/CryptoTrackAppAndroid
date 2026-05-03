@@ -65,7 +65,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif-medium"
-                    android:text="Авторизация"
+                    android:text="@string/login_title"
                     android:textColor="@color/text_primary"
                     android:textSize="21sp" />
 

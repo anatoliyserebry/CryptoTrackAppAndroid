@@ -16,39 +16,75 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ApiClient {
-    private static final String BYBIT_TICKERS_URL = "https://api.bybit.com/v5/market/tickers?category=spot";
-    private static final String MEXC_TICKERS_URL = "https://api.mexc.com/api/v3/ticker/24hr";
+    private static final String BYBIT_BASE_URL = "https://api.bybit.com";
+    private static final String BYBIT_TICKERS_URL = BYBIT_BASE_URL + "/v5/market/tickers?category=spot";
+    private static final String MEXC_BASE_URL = "https://api.mexc.com";
+    private static final String MEXC_TICKERS_URL = MEXC_BASE_URL + "/api/v3/ticker/24hr";
+    private static final String COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
+    private static final String COINGECKO_MARKETS_URL = COINGECKO_BASE_URL
+            + "/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,binancecoin,ripple,cardano,dogecoin,avalanche-2,polkadot,chainlink"
+            + "&order=market_cap_desc&per_page=20&page=1&sparkline=true&price_change_percentage=24h,7d,30d";
     private static final Set<String> TRACKED_USDT_SYMBOLS = new HashSet<>(Arrays.asList(
             "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
             "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT"
     ));
+    private static final Map<String, String> COINGECKO_IDS_BY_SYMBOL = new HashMap<>();
     private static final String[] CURRENCY_ENDPOINTS = {
             "/cryptocurrencies",
             "/api/cryptocurrencies",
             "/crypto"
     };
 
+    static {
+        COINGECKO_IDS_BY_SYMBOL.put("BTC", "bitcoin");
+        COINGECKO_IDS_BY_SYMBOL.put("ETH", "ethereum");
+        COINGECKO_IDS_BY_SYMBOL.put("SOL", "solana");
+        COINGECKO_IDS_BY_SYMBOL.put("BNB", "binancecoin");
+        COINGECKO_IDS_BY_SYMBOL.put("XRP", "ripple");
+        COINGECKO_IDS_BY_SYMBOL.put("ADA", "cardano");
+        COINGECKO_IDS_BY_SYMBOL.put("DOGE", "dogecoin");
+        COINGECKO_IDS_BY_SYMBOL.put("AVAX", "avalanche-2");
+        COINGECKO_IDS_BY_SYMBOL.put("DOT", "polkadot");
+        COINGECKO_IDS_BY_SYMBOL.put("LINK", "chainlink");
+    }
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final String baseUrl;
+    private final ApiSource source;
 
     public ApiClient() {
-        this(BuildConfig.API_BASE_URL);
+        this(BuildConfig.API_BASE_URL, ApiSource.AUTO);
+    }
+
+    public ApiClient(ApiSource source) {
+        this(BuildConfig.API_BASE_URL, source);
     }
 
     public ApiClient(String baseUrl) {
+        this(baseUrl, ApiSource.AUTO);
+    }
+
+    public ApiClient(String baseUrl, ApiSource source) {
         this.baseUrl = trimTrailingSlash(baseUrl);
+        this.source = source != null ? source : ApiSource.AUTO;
     }
 
     public void login(String email, String password, ApiCallback<String> callback) {
@@ -79,10 +115,9 @@ public class ApiClient {
     public void fetchCurrencies(String token, ApiCallback<List<CryptoCurrency>> callback) {
         executor.execute(() -> {
             Exception lastError = null;
-            for (String endpoint : CURRENCY_ENDPOINTS) {
+            for (ApiSource candidate : currencySources()) {
                 try {
-                    String response = request("GET", endpoint, null, token);
-                    List<CryptoCurrency> currencies = parseServerCurrencies(response);
+                    List<CryptoCurrency> currencies = fetchCurrenciesFromSource(candidate, token);
                     if (!currencies.isEmpty()) {
                         postSuccess(callback, currencies);
                         return;
@@ -92,22 +127,41 @@ public class ApiClient {
                 }
             }
 
-            try {
-                List<CryptoCurrency> exchangeCurrencies = fetchExchangeCurrencies();
-                if (!exchangeCurrencies.isEmpty()) {
-                    postSuccess(callback, exchangeCurrencies);
-                    return;
-                }
-            } catch (Exception error) {
-                lastError = error;
-            }
-
             List<CryptoCurrency> fallback = DemoData.currencies();
             if (!fallback.isEmpty()) {
                 postSuccess(callback, fallback);
             } else {
                 postError(callback, lastError != null ? lastError : new IOException("No market data"));
             }
+        });
+    }
+
+    public void fetchChart(
+            String token,
+            CryptoCurrency currency,
+            ChartRange range,
+            ApiSource requestedSource,
+            ApiCallback<ChartSeries> callback
+    ) {
+        executor.execute(() -> {
+            ChartRange selectedRange = range != null ? range : ChartRange.DAY;
+            ApiSource selectedSource = requestedSource != null ? requestedSource : source;
+            Exception lastError = null;
+
+            for (ApiSource candidate : chartSources(selectedSource, currency)) {
+                try {
+                    ChartSeries chartSeries = fetchChartFromSource(candidate, token, currency, selectedRange);
+                    if (chartSeries.getPrices().length > 1) {
+                        postSuccess(callback, chartSeries);
+                        return;
+                    }
+                } catch (Exception error) {
+                    lastError = error;
+                }
+            }
+
+            ChartSeries synthetic = syntheticSeries(currency, selectedRange, selectedSource, lastError != null);
+            postSuccess(callback, synthetic);
         });
     }
 
@@ -123,26 +177,149 @@ public class ApiClient {
         });
     }
 
-    private List<CryptoCurrency> fetchExchangeCurrencies() throws Exception {
-        List<CryptoCurrency> currencies = new ArrayList<>();
+    private List<ApiSource> currencySources() {
+        if (source == ApiSource.AUTO) {
+            return Arrays.asList(ApiSource.FASTAPI, ApiSource.COINGECKO, ApiSource.BYBIT, ApiSource.MEXC);
+        }
+        return Collections.singletonList(source);
+    }
+
+    private List<ApiSource> chartSources(ApiSource selectedSource, CryptoCurrency currency) {
+        if (selectedSource != ApiSource.AUTO) {
+            return Collections.singletonList(selectedSource);
+        }
+
+        LinkedHashSet<ApiSource> ordered = new LinkedHashSet<>();
+        ApiSource currencySource = currency != null ? ApiSource.fromCurrencySource(currency.getSource()) : ApiSource.AUTO;
+        if (currencySource != ApiSource.AUTO) {
+            ordered.add(currencySource);
+        }
+        ordered.add(ApiSource.COINGECKO);
+        ordered.add(ApiSource.BYBIT);
+        ordered.add(ApiSource.MEXC);
+        ordered.add(ApiSource.FASTAPI);
+        return new ArrayList<>(ordered);
+    }
+
+    private List<CryptoCurrency> fetchCurrenciesFromSource(ApiSource candidate, String token) throws Exception {
+        switch (candidate) {
+            case FASTAPI:
+                return fetchServerCurrencies(token);
+            case COINGECKO:
+                return parseCoinGeckoCurrencies(requestAbsolute("GET", COINGECKO_MARKETS_URL, null, null));
+            case BYBIT:
+                return parseBybitCurrencies(requestAbsolute("GET", BYBIT_TICKERS_URL, null, null));
+            case MEXC:
+                return parseMexcCurrencies(requestAbsolute("GET", MEXC_TICKERS_URL, null, null));
+            case AUTO:
+            default:
+                return new ArrayList<>();
+        }
+    }
+
+    private ChartSeries fetchChartFromSource(
+            ApiSource candidate,
+            String token,
+            CryptoCurrency currency,
+            ChartRange range
+    ) throws Exception {
+        switch (candidate) {
+            case FASTAPI:
+                return fetchServerChart(token, currency, range);
+            case COINGECKO:
+                return fetchCoinGeckoChart(currency, range);
+            case BYBIT:
+                return fetchBybitChart(currency, range);
+            case MEXC:
+                return fetchMexcChart(currency, range);
+            case AUTO:
+            default:
+                throw new IOException("Unsupported chart source");
+        }
+    }
+
+    private List<CryptoCurrency> fetchServerCurrencies(String token) throws Exception {
         Exception lastError = null;
+        for (String endpoint : CURRENCY_ENDPOINTS) {
+            try {
+                List<CryptoCurrency> currencies = parseServerCurrencies(request("GET", endpoint, null, token));
+                if (!currencies.isEmpty()) {
+                    return currencies;
+                }
+            } catch (Exception error) {
+                lastError = error;
+            }
+        }
+        throw lastError != null ? lastError : new IOException("No server currencies");
+    }
 
-        try {
-            currencies.addAll(parseBybitCurrencies(requestAbsolute("GET", BYBIT_TICKERS_URL, null, null)));
-        } catch (Exception error) {
-            lastError = error;
+    private ChartSeries fetchServerChart(String token, CryptoCurrency currency, ChartRange range) throws Exception {
+        String id = safePathSegment(currency.getId());
+        String symbol = safePathSegment(currency.getSymbol().toLowerCase(Locale.US));
+        String[] endpoints = {
+                "/cryptocurrencies/" + id + "/history?range=" + range.getKey(),
+                "/api/cryptocurrencies/" + id + "/history?range=" + range.getKey(),
+                "/crypto/" + id + "/history?range=" + range.getKey(),
+                "/cryptocurrencies/" + symbol + "/history?range=" + range.getKey(),
+                "/api/cryptocurrencies/" + symbol + "/history?range=" + range.getKey()
+        };
+
+        Exception lastError = null;
+        for (String endpoint : endpoints) {
+            try {
+                return parseServerChart(request("GET", endpoint, null, token), range);
+            } catch (Exception error) {
+                lastError = error;
+            }
+        }
+        throw lastError != null ? lastError : new IOException("No FastAPI chart data");
+    }
+
+    private ChartSeries fetchCoinGeckoChart(CryptoCurrency currency, ChartRange range) throws Exception {
+        String coinId = coingeckoId(currency);
+        if (coinId == null) {
+            throw new IOException("No CoinGecko id for " + currency.getSymbol());
         }
 
-        try {
-            currencies.addAll(parseMexcCurrencies(requestAbsolute("GET", MEXC_TICKERS_URL, null, null)));
-        } catch (Exception error) {
-            lastError = error;
-        }
+        String url = COINGECKO_BASE_URL
+                + "/coins/" + safePathSegment(coinId)
+                + "/market_chart?vs_currency=usd&days=" + range.getDays();
+        JSONObject root = new JSONObject(requestAbsolute("GET", url, null, null));
+        List<Point> points = parsePointArray(root.optJSONArray("prices"), System.currentTimeMillis() - range.durationMillis(), range.getCandleMillis());
+        return pointsToSeries(points, range, ApiSource.COINGECKO, ApiSource.COINGECKO.getDisplayName(), false);
+    }
 
-        if (currencies.isEmpty() && lastError != null) {
-            throw lastError;
-        }
-        return currencies;
+    private ChartSeries fetchBybitChart(CryptoCurrency currency, ChartRange range) throws Exception {
+        long end = System.currentTimeMillis();
+        long start = end - range.durationMillis();
+        String symbol = tradingPair(currency);
+        String url = BYBIT_BASE_URL
+                + "/v5/market/kline?category=spot"
+                + "&symbol=" + encodeQuery(symbol)
+                + "&interval=" + encodeQuery(range.getBybitInterval())
+                + "&start=" + start
+                + "&end=" + end
+                + "&limit=" + range.getLimit();
+        JSONObject root = new JSONObject(requestAbsolute("GET", url, null, null));
+        JSONObject result = root.optJSONObject("result");
+        JSONArray list = result != null ? result.optJSONArray("list") : null;
+        List<Point> points = parseKlineArray(list, 0, 4);
+        return pointsToSeries(points, range, ApiSource.BYBIT, ApiSource.BYBIT.getDisplayName(), false);
+    }
+
+    private ChartSeries fetchMexcChart(CryptoCurrency currency, ChartRange range) throws Exception {
+        long end = System.currentTimeMillis();
+        long start = end - range.durationMillis();
+        String symbol = tradingPair(currency);
+        String url = MEXC_BASE_URL
+                + "/api/v3/klines?symbol=" + encodeQuery(symbol)
+                + "&interval=" + encodeQuery(range.getMexcInterval())
+                + "&startTime=" + start
+                + "&endTime=" + end
+                + "&limit=" + range.getLimit();
+        JSONArray list = new JSONArray(requestAbsolute("GET", url, null, null));
+        List<Point> points = parseKlineArray(list, 0, 4);
+        return pointsToSeries(points, range, ApiSource.MEXC, ApiSource.MEXC.getDisplayName(), false);
     }
 
     private List<CryptoCurrency> parseServerCurrencies(String response) throws Exception {
@@ -194,7 +371,41 @@ public class ApiClient {
                     volume,
                     parseHistory(item, price, change),
                     favorite,
-                    source != null ? source : "FastAPI"
+                    source != null ? source : ApiSource.FASTAPI.getDisplayName()
+            ));
+        }
+        return currencies;
+    }
+
+    private List<CryptoCurrency> parseCoinGeckoCurrencies(String response) throws Exception {
+        JSONArray list = new JSONArray(response);
+        List<CryptoCurrency> currencies = new ArrayList<>();
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject item = list.optJSONObject(i);
+            if (item == null) {
+                continue;
+            }
+            String id = item.optString("id", "");
+            String symbol = item.optString("symbol", "").toUpperCase(Locale.US);
+            String name = item.optString("name", symbol);
+            double price = item.optDouble("current_price", 0.0);
+            double change = item.optDouble("price_change_percentage_24h", 0.0);
+            double marketCap = item.optDouble("market_cap", 0.0);
+            double volume = item.optDouble("total_volume", 0.0);
+            JSONObject sparkline = item.optJSONObject("sparkline_in_7d");
+            JSONArray prices = sparkline != null ? sparkline.optJSONArray("price") : null;
+
+            currencies.add(new CryptoCurrency(
+                    id,
+                    symbol,
+                    name,
+                    price,
+                    change,
+                    marketCap,
+                    volume,
+                    parseNumericHistory(prices, price, change),
+                    false,
+                    ApiSource.COINGECKO.getDisplayName()
             ));
         }
         return currencies;
@@ -231,7 +442,7 @@ public class ApiClient {
                     volume,
                     syntheticHistory(price, change),
                     false,
-                    "Bybit"
+                    ApiSource.BYBIT.getDisplayName()
             ));
         }
         return currencies;
@@ -277,15 +488,36 @@ public class ApiClient {
                     volume,
                     syntheticHistory(price, change),
                     false,
-                    "MEXC"
+                    ApiSource.MEXC.getDisplayName()
             ));
         }
         return currencies;
     }
 
+    private ChartSeries parseServerChart(String response, ChartRange range) throws Exception {
+        Object root = new JSONTokener(response).nextValue();
+        JSONArray array = null;
+        JSONArray timestamps = null;
+        if (root instanceof JSONArray) {
+            array = (JSONArray) root;
+        } else if (root instanceof JSONObject) {
+            JSONObject object = (JSONObject) root;
+            timestamps = firstArray(object, "timestamps", "times");
+            array = firstArray(object, "prices", "history", "sparkline", "data", "items", "results");
+        }
+
+        long start = System.currentTimeMillis() - range.durationMillis();
+        List<Point> points = parsePointArray(array, start, range.getCandleMillis(), timestamps);
+        return pointsToSeries(points, range, ApiSource.FASTAPI, ApiSource.FASTAPI.getDisplayName(), false);
+    }
+
     private double[] parseHistory(JSONObject item, double price, double changePercent) {
         JSONArray historyArray = firstArray(item, "history", "sparkline", "prices");
-        if (historyArray.length() > 1) {
+        return parseNumericHistory(historyArray, price, changePercent);
+    }
+
+    private double[] parseNumericHistory(JSONArray historyArray, double price, double changePercent) {
+        if (historyArray != null && historyArray.length() > 1) {
             double[] history = new double[historyArray.length()];
             for (int i = 0; i < historyArray.length(); i++) {
                 Object value = historyArray.opt(i);
@@ -313,38 +545,149 @@ public class ApiClient {
         };
     }
 
+    private ChartSeries syntheticSeries(CryptoCurrency currency, ChartRange range, ApiSource requestedSource, boolean fromError) {
+        int count = range.getLimit();
+        long end = System.currentTimeMillis();
+        long start = end - range.durationMillis();
+        long[] timestamps = new long[count];
+        double[] prices = new double[count];
+        double current = currency != null ? currency.getPriceUsd() : 1.0;
+        double baseChange = currency != null ? currency.getChangePercent24h() : 0.0;
+        double rangeChange = baseChange * Math.sqrt(Math.max(1, range.getDays()));
+        double first = current == 0.0 ? 1.0 : current / (1.0 + (rangeChange / 100.0));
+        double amplitude = Math.max(Math.abs(current - first) * 0.22, Math.max(current, 1.0) * 0.004);
+
+        for (int i = 0; i < count; i++) {
+            double progress = count == 1 ? 1.0 : (double) i / (double) (count - 1);
+            double trend = first + (current - first) * progress;
+            double wave = Math.sin(progress * Math.PI * 4.0) * amplitude * (1.0 - Math.abs(0.5 - progress));
+            timestamps[i] = start + Math.round((end - start) * progress);
+            prices[i] = Math.max(0.0, trend + wave);
+        }
+        prices[count - 1] = current;
+
+        String label = requestedSource == ApiSource.AUTO && currency != null
+                ? currency.getSource()
+                : requestedSource.getDisplayName();
+        if (fromError) {
+            label = label + " estimate";
+        }
+        return new ChartSeries(timestamps, prices, range, requestedSource, label, true);
+    }
+
+    private List<Point> parsePointArray(JSONArray array, long start, long stepMillis) {
+        return parsePointArray(array, start, stepMillis, null);
+    }
+
+    private List<Point> parsePointArray(JSONArray array, long start, long stepMillis, JSONArray fallbackTimestamps) {
+        List<Point> points = new ArrayList<>();
+        if (array == null) {
+            return points;
+        }
+        for (int i = 0; i < array.length(); i++) {
+            Object value = array.opt(i);
+            long time = timestampFromArray(fallbackTimestamps, i, start + (i * stepMillis));
+            double price = Double.NaN;
+
+            if (value instanceof JSONArray) {
+                JSONArray row = (JSONArray) value;
+                time = normalizeTimestamp(parseLong(row.opt(0), time));
+                price = parseDoubleValue(row.opt(1));
+            } else if (value instanceof JSONObject) {
+                JSONObject item = (JSONObject) value;
+                time = normalizeTimestamp(firstLong(item, time, "timestamp", "time", "date", "openTime", "closeTime"));
+                price = firstDouble(item, Double.NaN, "price", "close", "closePrice", "value", "current_price");
+            } else {
+                price = parseDoubleValue(value);
+            }
+
+            if (!Double.isNaN(price) && price > 0.0) {
+                points.add(new Point(time, price));
+            }
+        }
+        return points;
+    }
+
+    private List<Point> parseKlineArray(JSONArray array, int timestampIndex, int closeIndex) {
+        List<Point> points = new ArrayList<>();
+        if (array == null) {
+            return points;
+        }
+        for (int i = 0; i < array.length(); i++) {
+            JSONArray row = array.optJSONArray(i);
+            if (row == null) {
+                continue;
+            }
+            long timestamp = normalizeTimestamp(parseLong(row.opt(timestampIndex), 0L));
+            double close = parseDoubleValue(row.opt(closeIndex));
+            if (timestamp > 0 && !Double.isNaN(close) && close > 0.0) {
+                points.add(new Point(timestamp, close));
+            }
+        }
+        return points;
+    }
+
+    private ChartSeries pointsToSeries(
+            List<Point> points,
+            ChartRange range,
+            ApiSource source,
+            String sourceLabel,
+            boolean estimated
+    ) throws IOException {
+        if (points == null || points.size() < 2) {
+            throw new IOException("Not enough chart points");
+        }
+        Collections.sort(points, Comparator.comparingLong(point -> point.timestamp));
+
+        long[] timestamps = new long[points.size()];
+        double[] prices = new double[points.size()];
+        for (int i = 0; i < points.size(); i++) {
+            Point point = points.get(i);
+            timestamps[i] = point.timestamp;
+            prices[i] = point.price;
+        }
+        return new ChartSeries(timestamps, prices, range, source, sourceLabel, estimated);
+    }
+
     private String request(String method, String endpoint, String body, String token) throws IOException {
         return requestAbsolute(method, baseUrl + endpoint, body, token);
     }
 
     private String requestAbsolute(String method, String urlValue, String body, String token) throws IOException {
-        URL url = new URL(urlValue);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod(method);
-        connection.setConnectTimeout(4500);
-        connection.setReadTimeout(4500);
-        connection.setRequestProperty("Accept", "application/json");
-        if (token != null && !token.trim().isEmpty()) {
-            connection.setRequestProperty("Authorization", "Bearer " + token);
-        }
-        if (body != null) {
-            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            connection.setFixedLengthStreamingMode(bytes.length);
-            try (OutputStream outputStream = connection.getOutputStream()) {
-                outputStream.write(bytes);
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(urlValue);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod(method);
+            connection.setConnectTimeout(7000);
+            connection.setReadTimeout(7000);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("User-Agent", "CryptoTrack Android");
+            if (token != null && !token.trim().isEmpty()) {
+                connection.setRequestProperty("Authorization", "Bearer " + token);
+            }
+            if (body != null) {
+                byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                connection.setFixedLengthStreamingMode(bytes.length);
+                try (OutputStream outputStream = connection.getOutputStream()) {
+                    outputStream.write(bytes);
+                }
+            }
+
+            int code = connection.getResponseCode();
+            InputStream stream = code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream();
+            String response = readFully(stream);
+            if (code < 200 || code >= 300) {
+                throw new IOException("HTTP " + code + ": " + response);
+            }
+            return response;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
             }
         }
-
-        int code = connection.getResponseCode();
-        InputStream stream = code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream();
-        String response = readFully(stream);
-        connection.disconnect();
-        if (code < 200 || code >= 300) {
-            throw new IOException("HTTP " + code + ": " + response);
-        }
-        return response;
     }
 
     private String readFully(InputStream inputStream) throws IOException {
@@ -384,28 +727,94 @@ public class ApiClient {
     private double firstDouble(JSONObject object, double fallback, String... keys) {
         for (String key : keys) {
             Object value = object.opt(key);
-            if (value instanceof Number) {
-                return ((Number) value).doubleValue();
+            double parsed = parseDoubleValue(value);
+            if (!Double.isNaN(parsed)) {
+                return parsed;
             }
-            if (value instanceof String) {
-                double parsed = parseDouble((String) value);
-                if (!Double.isNaN(parsed)) {
-                    return parsed;
-                }
+        }
+        return fallback;
+    }
+
+    private long firstLong(JSONObject object, long fallback, String... keys) {
+        for (String key : keys) {
+            Object value = object.opt(key);
+            long parsed = parseLong(value, Long.MIN_VALUE);
+            if (parsed != Long.MIN_VALUE) {
+                return parsed;
             }
         }
         return fallback;
     }
 
     private double parseDouble(String value) {
-        if (value == null || value.trim().isEmpty() || "null".equalsIgnoreCase(value)) {
-            return 0.0;
+        double parsed = parseDoubleValue(value);
+        return Double.isNaN(parsed) ? 0.0 : parsed;
+    }
+
+    private double parseDoubleValue(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
         }
-        try {
-            return Double.parseDouble(value);
-        } catch (NumberFormatException ignored) {
-            return 0.0;
+        if (value instanceof String) {
+            String clean = ((String) value).trim();
+            if (clean.isEmpty() || "null".equalsIgnoreCase(clean)) {
+                return Double.NaN;
+            }
+            try {
+                return Double.parseDouble(clean);
+            } catch (NumberFormatException ignored) {
+                return Double.NaN;
+            }
         }
+        return Double.NaN;
+    }
+
+    private long parseLong(Object value, long fallback) {
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof String) {
+            String clean = ((String) value).trim();
+            if (clean.isEmpty() || "null".equalsIgnoreCase(clean)) {
+                return fallback;
+            }
+            try {
+                return Long.parseLong(clean);
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    private long timestampFromArray(JSONArray timestamps, int index, long fallback) {
+        if (timestamps == null || index >= timestamps.length()) {
+            return fallback;
+        }
+        return normalizeTimestamp(parseLong(timestamps.opt(index), fallback));
+    }
+
+    private long normalizeTimestamp(long timestamp) {
+        if (timestamp > 0 && timestamp < 10_000_000_000L) {
+            return timestamp * 1000L;
+        }
+        return timestamp;
+    }
+
+    private String coingeckoId(CryptoCurrency currency) {
+        if (currency == null) {
+            return null;
+        }
+        if (ApiSource.fromCurrencySource(currency.getSource()) == ApiSource.COINGECKO) {
+            return currency.getId();
+        }
+        return COINGECKO_IDS_BY_SYMBOL.get(currency.getSymbol().toUpperCase(Locale.US));
+    }
+
+    private String tradingPair(CryptoCurrency currency) {
+        String symbol = currency != null ? currency.getSymbol() : "BTC";
+        String upper = symbol.toUpperCase(Locale.US);
+        return upper.endsWith("USDT") ? upper : upper + "USDT";
     }
 
     private String displayName(String base) {
@@ -445,11 +854,29 @@ public class ApiClient {
         return value;
     }
 
+    private String safePathSegment(String value) throws IOException {
+        return encodeQuery(value == null ? "" : value);
+    }
+
+    private String encodeQuery(String value) throws IOException {
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8.name());
+    }
+
     private <T> void postSuccess(ApiCallback<T> callback, T result) {
         mainHandler.post(() -> callback.onSuccess(result));
     }
 
     private <T> void postError(ApiCallback<T> callback, Exception error) {
         mainHandler.post(() -> callback.onError(error));
+    }
+
+    private static class Point {
+        final long timestamp;
+        final double price;
+
+        Point(long timestamp, double price) {
+            this.timestamp = timestamp;
+            this.price = price;
+        }
     }
 }

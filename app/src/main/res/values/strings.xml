@@ -1,16 +1,25 @@
 <resources>
     <string name="app_name">CryptoTrack</string>
-    <string name="login_subtitle">Курсы криптовалют, избранное и уведомления в одном приложении</string>
+    <string name="login_subtitle">Crypto prices, favorites and notifications in one app</string>
     <string name="server_url_hint">FastAPI: http://10.0.2.2:8000</string>
     <string name="email">Email</string>
-    <string name="password">Пароль</string>
-    <string name="login">Войти</string>
-    <string name="demo_login">Можно войти с любым email и паролем для демонстрации.</string>
-    <string name="market">Рынок</string>
-    <string name="favorites">Избранное</string>
-    <string name="notifications">Уведомления</string>
-    <string name="search_hint">Поиск валюты</string>
-    <string name="empty_market">Пока нет данных. Проверьте сервер или обновите экран.</string>
-    <string name="empty_favorites">Добавьте валюты в избранное, чтобы видеть их здесь.</string>
-    <string name="details">Детали</string>
+    <string name="password">Password</string>
+    <string name="login">Sign in</string>
+    <string name="login_title">Sign in</string>
+    <string name="demo_login">You can use any email and password for the demo.</string>
+    <string name="market">Market</string>
+    <string name="favorites">Favorites</string>
+    <string name="notifications">Notifications</string>
+    <string name="search_hint">Search crypto</string>
+    <string name="empty_market">No data yet. Check the server, choose another API, or refresh again.</string>
+    <string name="empty_favorites">Add cryptocurrencies to favorites to see them here.</string>
+    <string name="details">Details</string>
+    <string name="back">Back</string>
+    <string name="refresh">Refresh</string>
+    <string name="updating_data">Updating data...</string>
+    <string name="data_source">Data source</string>
+    <string name="price_evolution">Price evolution</string>
+    <string name="loading_market_data">Loading market data...</string>
+    <string name="market_cap">Market cap</string>
+    <string name="volume_24h">24h volume</string>
 </resources>

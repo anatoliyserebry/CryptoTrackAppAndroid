@@ -11,6 +11,7 @@ public class SessionManager {
     private static final String KEY_TOKEN = "jwt_token";
     private static final String KEY_FAVORITES = "favorites";
     private static final String KEY_NOTIFICATIONS = "notifications_enabled";
+    private static final String KEY_API_SOURCE = "api_source";
 
     private final SharedPreferences preferences;
 
@@ -55,5 +56,13 @@ public class SessionManager {
 
     public void setNotificationsEnabled(boolean enabled) {
         preferences.edit().putBoolean(KEY_NOTIFICATIONS, enabled).apply();
+    }
+
+    public ApiSource getApiSource() {
+        return ApiSource.fromKey(preferences.getString(KEY_API_SOURCE, ApiSource.AUTO.getKey()));
+    }
+
+    public void setApiSource(ApiSource source) {
+        preferences.edit().putString(KEY_API_SOURCE, source != null ? source.getKey() : ApiSource.AUTO.getKey()).apply();
     }
 }
