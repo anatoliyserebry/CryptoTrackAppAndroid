@@ -1,9 +1,12 @@
 package com.example.cryptotrackappandroid.ui;
 
+import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
@@ -40,7 +43,7 @@ public class DetailActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_detail);
 
-        Serializable serializable = getIntent().getSerializableExtra(EXTRA_CRYPTO);
+        Serializable serializable = getCryptoExtra();
         if (!(serializable instanceof CryptoCurrency)) {
             finish();
             return;
@@ -63,7 +66,14 @@ public class DetailActivity extends AppCompatActivity {
 
         bindCurrency();
         setupRangeActions();
-        findViewById(R.id.backButton).setOnClickListener(v -> finish());
+        ImageButton backButton = findViewById(R.id.backButton);
+        backButton.setOnClickListener(v -> navigateBack());
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                navigateBack();
+            }
+        });
         favoriteButton.setOnClickListener(v -> toggleFavorite());
         loadChart(ChartRange.DAY);
     }
@@ -152,6 +162,14 @@ public class DetailActivity extends AppCompatActivity {
         return selectedSource.getDisplayName();
     }
 
+    @SuppressWarnings("deprecation")
+    private Serializable getCryptoExtra() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return getIntent().getSerializableExtra(EXTRA_CRYPTO, CryptoCurrency.class);
+        }
+        return getIntent().getSerializableExtra(EXTRA_CRYPTO);
+    }
+
     private void toggleFavorite() {
         boolean favorite = !currency.isFavorite();
         currency.setFavorite(favorite);
@@ -170,5 +188,18 @@ public class DetailActivity extends AppCompatActivity {
 
     private void refreshFavoriteIcon() {
         favoriteButton.setImageResource(currency.isFavorite() ? R.drawable.ic_star_24 : R.drawable.ic_star_border_24);
+        favoriteButton.setColorFilter(ContextCompat.getColor(
+                this,
+                currency.isFavorite() ? R.color.brand_secondary : R.color.text_inverse
+        ));
+    }
+
+    private void navigateBack() {
+        if (isTaskRoot()) {
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+        }
+        finish();
     }
 }

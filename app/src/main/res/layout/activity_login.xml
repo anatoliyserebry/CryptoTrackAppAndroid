@@ -15,17 +15,17 @@
 
         <Space
             android:layout_width="1dp"
-            android:layout_height="42dp" />
+            android:layout_height="50dp" />
 
         <TextView
-            android:layout_width="72dp"
-            android:layout_height="72dp"
+            android:layout_width="78dp"
+            android:layout_height="78dp"
             android:background="@drawable/bg_login_mark"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
             android:text="CT"
             android:textColor="@color/text_inverse"
-            android:textSize="26sp" />
+            android:textSize="27sp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -34,7 +34,7 @@
             android:fontFamily="sans-serif-medium"
             android:text="@string/app_name"
             android:textColor="@color/text_primary"
-            android:textSize="32sp" />
+            android:textSize="34sp" />
 
         <TextView
             android:layout_width="match_parent"
@@ -52,8 +52,9 @@
             android:layout_marginTop="32dp"
             app:cardBackgroundColor="@color/surface"
             app:cardCornerRadius="8dp"
+            app:cardElevation="4dp"
             app:strokeColor="@color/divider"
-            app:strokeWidth="1dp">
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -87,7 +88,9 @@
                     app:boxCornerRadiusBottomEnd="8dp"
                     app:boxCornerRadiusBottomStart="8dp"
                     app:boxCornerRadiusTopEnd="8dp"
-                    app:boxCornerRadiusTopStart="8dp">
+                    app:boxCornerRadiusTopStart="8dp"
+                    app:boxStrokeColor="@color/brand_primary"
+                    app:hintTextColor="@color/brand_primary">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/emailInput"
@@ -95,7 +98,8 @@
                         android:layout_height="wrap_content"
                         android:inputType="textEmailAddress"
                         android:singleLine="true"
-                        android:text="demo@cryptotrack.local" />
+                        android:text="demo@cryptotrack.local"
+                        android:textColor="@color/text_primary" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -108,6 +112,7 @@
                     app:boxCornerRadiusBottomStart="8dp"
                     app:boxCornerRadiusTopEnd="8dp"
                     app:boxCornerRadiusTopStart="8dp"
+                    app:boxStrokeColor="@color/brand_primary"
                     app:endIconMode="password_toggle">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -116,7 +121,8 @@
                         android:layout_height="wrap_content"
                         android:inputType="textPassword"
                         android:singleLine="true"
-                        android:text="demo1234" />
+                        android:text="demo1234"
+                        android:textColor="@color/text_primary" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.button.MaterialButton
@@ -126,7 +132,8 @@
                     android:layout_marginTop="18dp"
                     android:text="@string/login"
                     android:textSize="16sp"
-                    app:backgroundTint="@color/brand_primary" />
+                    app:backgroundTint="@color/brand_primary"
+                    app:cornerRadius="8dp" />
 
                 <ProgressBar
                     android:id="@+id/loginProgress"
