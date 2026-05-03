@@ -411,9 +411,9 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     private void updateHeaderSubtitle() {
         if (currentScreen == Screen.PORTFOLIO) {
             int count = sessionManager.getPortfolioHoldings().size();
-            updatedAtText.setText("Portefeuille local - " + count + (count == 1 ? " position" : " positions"));
+            updatedAtText.setText("Local portfolio - " + count + (count == 1 ? " position" : " positions"));
         } else if (currentScreen == Screen.CONVERTER) {
-            updatedAtText.setText(fiatRatesFromNetwork ? "Taux fiat mis a jour" : "Taux fiat indicatifs");
+            updatedAtText.setText(fiatRatesFromNetwork ? "Fiat rates updated" : "Indicative fiat rates");
         } else {
             updatedAtText.setText(lastMarketStatus != null ? lastMarketStatus : getString(R.string.updating_data));
         }
@@ -426,7 +426,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 favoriteCount++;
             }
         }
-        marketCountText.setText(allCurrencies.size() + (allCurrencies.size() > 1 ? " actifs" : " actif"));
+        marketCountText.setText(allCurrencies.size() + (allCurrencies.size() == 1 ? " asset" : " assets"));
         favoriteCountText.setText(favoriteCount + (favoriteCount == 1 ? " favorite" : " favorites"));
     }
 
@@ -486,18 +486,18 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     private void savePortfolioHolding() {
         CryptoCurrency selected = selectedPortfolioCurrency();
         if (selected == null) {
-            Snackbar.make(portfolioContent, "Les prix sont encore en chargement", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(portfolioContent, "Prices are still loading", Snackbar.LENGTH_SHORT).show();
             return;
         }
         Double amount = parseAmount(portfolioAmountInput);
         if (amount == null || amount <= 0.0) {
-            Snackbar.make(portfolioContent, "Saisissez une quantite positive", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(portfolioContent, "Enter a positive quantity", Snackbar.LENGTH_SHORT).show();
             return;
         }
         sessionManager.setPortfolioHolding(selected.getSymbol(), amount);
         renderPortfolio();
         updateHeaderSubtitle();
-        Snackbar.make(portfolioContent, "Position enregistree", Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(portfolioContent, "Position saved", Snackbar.LENGTH_SHORT).show();
     }
 
     private void removeSelectedPortfolioHolding() {
@@ -509,7 +509,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         portfolioAmountInput.setText("");
         renderPortfolio();
         updateHeaderSubtitle();
-        Snackbar.make(portfolioContent, "Position supprimee", Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(portfolioContent, "Position removed", Snackbar.LENGTH_SHORT).show();
     }
 
     private void renderPortfolio() {
@@ -595,7 +595,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         TextView nameText = createPortfolioText(name, R.color.text_primary, 16, true);
         TextView amountText = createPortfolioText(Formatters.quantity(amount) + " " + symbol, R.color.text_secondary, 13, false);
         TextView valueText = createPortfolioText(
-                priced ? Formatters.price(valueUsd) + " - " + Formatters.change(changePercent) : "Prix indisponible",
+                priced ? Formatters.price(valueUsd) + " - " + Formatters.change(changePercent) : "Price unavailable",
                 priced && changePercent < 0.0 ? R.color.negative : priced ? R.color.positive : R.color.text_secondary,
                 13,
                 false
@@ -614,7 +614,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
             sessionManager.removePortfolioHolding(symbol);
             renderPortfolio();
             updateHeaderSubtitle();
-            Snackbar.make(portfolioContent, "Position supprimee", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(portfolioContent, "Position removed", Snackbar.LENGTH_SHORT).show();
         });
         row.addView(deleteButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
@@ -731,7 +731,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         String fromCode = selectedConverterCode(converterFromSpinner);
         String toCode = selectedConverterCode(converterToSpinner);
         if (amount == null || fromCode == null || toCode == null) {
-            converterResultText.setText("Saisissez un montant");
+            converterResultText.setText("Enter an amount");
             converterRateText.setText(getString(R.string.converter_rate));
             return;
         }
@@ -742,14 +742,14 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         Double rate = rateUsd != null ? usdToCode(rateUsd, toCode) : null;
 
         if (converted == null || rate == null) {
-            converterResultText.setText("Taux indisponible");
-            converterRateText.setText("Prix crypto en cours de chargement");
+            converterResultText.setText("Rate unavailable");
+            converterRateText.setText("Crypto prices are still loading");
             return;
         }
 
         converterResultText.setText(formatConverted(converted, toCode));
         converterRateText.setText("1 " + fromCode + " = " + formatConverted(rate, toCode)
-                + " - " + (fiatRatesFromNetwork ? "taux mis a jour" : "taux indicatif"));
+                + " - " + (fiatRatesFromNetwork ? "rates updated" : "indicative rate"));
     }
 
     private String selectedConverterCode(Spinner spinner) {

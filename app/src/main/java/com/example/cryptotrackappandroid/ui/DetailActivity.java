@@ -136,7 +136,7 @@ public class DetailActivity extends AppCompatActivity {
         updateChangeStyle(positive);
 
         String sourceText = chartSeries.isEstimated()
-                ? "Estimation locale"
+                ? "Local estimate"
                 : chartSeries.getSourceLabel();
         chartMetaText.setText(sourceText
                 + " - " + chartSeries.getPrices().length + " points"
@@ -151,7 +151,7 @@ public class DetailActivity extends AppCompatActivity {
 
     private String formatSelectedPoint(long timestamp, double price) {
         String pattern = selectedRange == ChartRange.DAY ? "HH:mm" : "dd MMM HH:mm";
-        String formattedTime = new SimpleDateFormat(pattern, Locale.getDefault()).format(new Date(timestamp));
+        String formattedTime = new SimpleDateFormat(pattern, Locale.US).format(new Date(timestamp));
         return Formatters.price(price) + " - " + formattedTime;
     }
 

@@ -120,7 +120,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:fontFamily="sans-serif-medium"
-                                android:text="0 actifs"
+                                android:text="0 assets"
                                 android:textColor="@color/text_primary"
                                 android:textSize="18sp" />
 
