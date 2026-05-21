@@ -1,6 +1,7 @@
 package com.example.cryptotrackappandroid.ui;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -49,6 +50,11 @@ public class DetailActivity extends AppCompatActivity {
     private SparklineView chartView;
     private ApiSource selectedSource = ApiSource.AUTO;
     private ChartRange selectedRange = ChartRange.DAY;
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -117,10 +123,13 @@ public class DetailActivity extends AppCompatActivity {
         marketCapText.setText(Formatters.compactUsd(currency.getMarketCapUsd()));
         volumeText.setText(Formatters.compactUsd(currency.getVolume24hUsd()));
         chartView.setValues(currency.getHistory(), positive);
-        chartMetaText.setText("Loading market data...");
-        descriptionText.setText(currency.getName() + " (" + currency.getSymbol() + ") is displayed through "
-                + currency.getSource()
-                + ". The chart can now be explored point by point across 1D, 7D and 30D.");
+        chartMetaText.setText(R.string.loading_market_data);
+        descriptionText.setText(getString(
+                R.string.detail_description_format,
+                currency.getName(),
+                currency.getSymbol(),
+                currency.getSource()
+        ));
         refreshFavoriteIcon();
         renderPriceAlert();
     }
@@ -139,7 +148,7 @@ public class DetailActivity extends AppCompatActivity {
 
     private void loadChart(ChartRange range) {
         selectedRange = range;
-        chartMetaText.setText("Loading " + range.getKey() + " from " + sourceLabelForLoading() + "...");
+        chartMetaText.setText(getString(R.string.chart_loading_format, range.getKey(), sourceLabelForLoading()));
         apiClient.fetchChart(sessionManager.getToken(), currency, range, selectedSource, new ApiCallback<ChartSeries>() {
             @Override
             public void onSuccess(ChartSeries result) {
@@ -148,7 +157,7 @@ public class DetailActivity extends AppCompatActivity {
 
             @Override
             public void onError(Exception error) {
-                chartMetaText.setText("Unable to load the " + selectedRange.getKey() + " chart");
+                chartMetaText.setText(getString(R.string.chart_unavailable_format, selectedRange.getKey()));
             }
         });
     }
@@ -160,12 +169,15 @@ public class DetailActivity extends AppCompatActivity {
         updateChangeStyle(positive);
 
         String sourceText = chartSeries.isEstimated()
-                ? "Local estimate"
+                ? getString(R.string.local_estimate)
                 : chartSeries.getSourceLabel();
-        chartMetaText.setText(sourceText
-                + " - " + chartSeries.getPrices().length + " points"
-                + " - min " + Formatters.price(chartSeries.getMinPrice())
-                + " / max " + Formatters.price(chartSeries.getMaxPrice()));
+        chartMetaText.setText(getString(
+                R.string.chart_meta_format,
+                sourceText,
+                chartSeries.getPrices().length,
+                Formatters.price(chartSeries.getMinPrice()),
+                Formatters.price(chartSeries.getMaxPrice())
+        ));
     }
 
     private void updateChangeStyle(boolean positive) {
@@ -175,13 +187,13 @@ public class DetailActivity extends AppCompatActivity {
 
     private String formatSelectedPoint(long timestamp, double price) {
         String pattern = selectedRange == ChartRange.DAY ? "HH:mm" : "dd MMM HH:mm";
-        String formattedTime = new SimpleDateFormat(pattern, Locale.US).format(new Date(timestamp));
+        String formattedTime = new SimpleDateFormat(pattern, Locale.getDefault()).format(new Date(timestamp));
         return Formatters.price(price) + " - " + formattedTime;
     }
 
     private String sourceLabelForLoading() {
         if (selectedSource == ApiSource.AUTO) {
-            return "the best available API";
+            return getString(R.string.best_available_api);
         }
         return selectedSource.getDisplayName();
     }
@@ -221,7 +233,7 @@ public class DetailActivity extends AppCompatActivity {
     private void savePriceAlert() {
         Double targetPrice = parsePriceAlertTarget();
         if (targetPrice == null || targetPrice <= 0.0) {
-            Snackbar.make(priceAlertInput, "Enter a positive target price", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(priceAlertInput, R.string.enter_positive_target_price, Snackbar.LENGTH_SHORT).show();
             return;
         }
 
@@ -229,22 +241,22 @@ public class DetailActivity extends AppCompatActivity {
         sessionManager.setPriceAlert(currency.getSymbol(), targetPrice, triggerAbove);
         renderPriceAlert();
         enableNotificationsForAlerts();
-        Snackbar.make(priceAlertInput, "Price alert saved", Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(priceAlertInput, R.string.price_alert_saved, Snackbar.LENGTH_SHORT).show();
     }
 
     private void removePriceAlert() {
         sessionManager.removePriceAlert(currency.getSymbol());
         priceAlertInput.setText("");
         renderPriceAlert();
-        Snackbar.make(priceAlertInput, "Price alert removed", Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(priceAlertInput, R.string.price_alert_removed, Snackbar.LENGTH_SHORT).show();
     }
 
     private void renderPriceAlert() {
         PriceAlert alert = sessionManager.getPriceAlert(currency.getSymbol());
-        String currentPrice = "Current price: " + Formatters.price(currency.getPriceUsd()) + ". ";
+        String currentPrice = getString(R.string.current_price_format, Formatters.price(currency.getPriceUsd()));
 
         if (alert == null) {
-            priceAlertStatusText.setText(currentPrice + "No target alert set.");
+            priceAlertStatusText.setText(getString(R.string.price_alert_none_format, currentPrice));
             removePriceAlertButton.setEnabled(false);
             return;
         }
@@ -254,11 +266,11 @@ public class DetailActivity extends AppCompatActivity {
             priceAlertInput.setSelection(priceAlertInput.getText().length());
         }
 
-        String direction = alert.isTriggerAbove() ? "rises to" : "falls to";
+        String direction = getString(alert.isTriggerAbove() ? R.string.price_alert_direction_rises : R.string.price_alert_direction_falls);
         String status = alert.isTriggered()
-                ? "Target reached. Save a new price to reactivate it."
-                : "Notify when " + alert.getSymbol() + " " + direction + " " + Formatters.price(alert.getTargetPriceUsd()) + ".";
-        priceAlertStatusText.setText(currentPrice + status);
+                ? getString(R.string.price_alert_reached_status)
+                : getString(R.string.price_alert_status_format, alert.getSymbol(), direction, Formatters.price(alert.getTargetPriceUsd()));
+        priceAlertStatusText.setText(getString(R.string.price_alert_status_with_current, currentPrice, status));
         removePriceAlertButton.setEnabled(true);
     }
 
@@ -301,7 +313,7 @@ public class DetailActivity extends AppCompatActivity {
         sessionManager.setNotificationsEnabled(granted);
         Snackbar.make(
                 priceAlertInput,
-                granted ? "Notifications enabled" : "Notification permission denied",
+                granted ? R.string.notifications_enabled : R.string.notification_permission_denied,
                 Snackbar.LENGTH_LONG
         ).show();
     }

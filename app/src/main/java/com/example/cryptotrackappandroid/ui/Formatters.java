@@ -1,5 +1,9 @@
 package com.example.cryptotrackappandroid.ui;
 
+import android.content.Context;
+
+import com.example.cryptotrackappandroid.R;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -85,7 +89,8 @@ public final class Formatters {
         return clean.length() <= 3 ? clean : clean.substring(0, 3);
     }
 
-    public static String updatedNow() {
-        return "Updated at " + new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+    public static String updatedNow(Context context) {
+        String time = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+        return context.getString(R.string.updated_at_time, time);
     }
 }

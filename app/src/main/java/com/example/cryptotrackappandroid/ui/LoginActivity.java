@@ -1,5 +1,6 @@
 package com.example.cryptotrackappandroid.ui;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
@@ -23,6 +24,11 @@ public class LoginActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private SessionManager sessionManager;
     private ApiClient apiClient;
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,7 +66,7 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onError(Exception error) {
                 setLoading(false);
-                Snackbar.make(loginButton, "Enter an email and password", Snackbar.LENGTH_LONG).show();
+                Snackbar.make(loginButton, R.string.login_error_credentials, Snackbar.LENGTH_LONG).show();
             }
         });
     }

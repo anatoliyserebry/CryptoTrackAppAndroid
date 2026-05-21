@@ -1,6 +1,7 @@
 package com.example.cryptotrackappandroid.ui;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
@@ -82,6 +83,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     private TextInputEditText searchInput;
     private SwitchMaterial notificationSwitch;
     private Spinner apiSourceSpinner;
+    private Spinner languageSpinner;
     private View marketControls;
     private View marketContent;
     private View portfolioContent;
@@ -100,9 +102,15 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     private TextView converterRateText;
     private boolean showingFavorites = false;
     private boolean refreshingConverterOptions = false;
+    private boolean refreshingLanguageSpinner = false;
     private boolean fiatRatesFromNetwork = false;
     private Screen currentScreen = Screen.MARKET;
     private String lastMarketStatus;
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -154,6 +162,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         searchInput = findViewById(R.id.searchInput);
         notificationSwitch = findViewById(R.id.notificationSwitch);
         apiSourceSpinner = findViewById(R.id.apiSourceSpinner);
+        languageSpinner = findViewById(R.id.languageSpinner);
         marketControls = findViewById(R.id.marketControls);
         marketContent = findViewById(R.id.marketContent);
         portfolioContent = findViewById(R.id.portfolioContent);
@@ -182,6 +191,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
 
     private void setupActions() {
         setupApiSourceSpinner();
+        setupLanguageSpinner();
 
         ImageButton refreshButton = findViewById(R.id.refreshButton);
         refreshButton.setOnClickListener(v -> {
@@ -216,7 +226,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
             }
             sessionManager.setNotificationsEnabled(isChecked);
             if (isChecked) {
-                Snackbar.make(notificationSwitch, "Notifications enabled", Snackbar.LENGTH_SHORT).show();
+                Snackbar.make(notificationSwitch, R.string.notifications_enabled, Snackbar.LENGTH_SHORT).show();
             }
         });
 
@@ -283,13 +293,58 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 refreshConverterOptions();
                 renderCurrentScreen();
                 loadCurrencies(true);
-                Snackbar.make(apiSourceSpinner, "API: " + selectedSource.getDisplayName(), Snackbar.LENGTH_SHORT).show();
+                Snackbar.make(apiSourceSpinner, getString(R.string.api_selected, selectedSource.getDisplayName()), Snackbar.LENGTH_SHORT).show();
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
+    }
+
+    private void setupLanguageSpinner() {
+        ArrayAdapter<String> languageAdapter = new ArrayAdapter<>(
+                this,
+                R.layout.item_spinner_selected,
+                new String[]{
+                        getString(R.string.language_english),
+                        getString(R.string.language_french),
+                        getString(R.string.language_russian)
+                }
+        );
+        languageAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
+        refreshingLanguageSpinner = true;
+        languageSpinner.setAdapter(languageAdapter);
+        languageSpinner.setSelection(languageIndex(sessionManager.getLanguageCode()), false);
+        refreshingLanguageSpinner = false;
+        languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (refreshingLanguageSpinner) {
+                    return;
+                }
+                String selectedCode = LocaleHelper.LANGUAGE_CODES[position];
+                if (selectedCode.equals(sessionManager.getLanguageCode())) {
+                    return;
+                }
+                sessionManager.setLanguageCode(selectedCode);
+                LocaleHelper.setLanguageCode(MainActivity.this, selectedCode);
+                recreate();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
+    private int languageIndex(String languageCode) {
+        for (int i = 0; i < LocaleHelper.LANGUAGE_CODES.length; i++) {
+            if (LocaleHelper.LANGUAGE_CODES[i].equals(languageCode)) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     private void loadCurrencies(boolean showProgress) {
@@ -309,7 +364,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 allCurrencies.clear();
                 allCurrencies.addAll(result);
                 indexCurrencies();
-                lastMarketStatus = Formatters.updatedNow() + " - " + loadedSourceLabel(result);
+                lastMarketStatus = Formatters.updatedNow(MainActivity.this) + " - " + loadedSourceLabel(result);
                 refreshPortfolioCryptoSpinner();
                 refreshConverterOptions();
                 updateHeaderSubtitle();
@@ -321,7 +376,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 progressBar.setVisibility(View.GONE);
                 emptyText.setText(R.string.empty_market);
                 emptyText.setVisibility(View.VISIBLE);
-                Snackbar.make(emptyText, "Unable to fetch market data", Snackbar.LENGTH_LONG).show();
+                Snackbar.make(emptyText, R.string.unable_fetch_market_data, Snackbar.LENGTH_LONG).show();
             }
         });
     }
@@ -446,9 +501,12 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     private void updateHeaderSubtitle() {
         if (currentScreen == Screen.PORTFOLIO) {
             int count = sessionManager.getPortfolioHoldings().size();
-            updatedAtText.setText("Local portfolio - " + count + (count == 1 ? " position" : " positions"));
+            updatedAtText.setText(getString(
+                    R.string.local_portfolio_status,
+                    getResources().getQuantityString(R.plurals.position_count, count, count)
+            ));
         } else if (currentScreen == Screen.CONVERTER) {
-            updatedAtText.setText(fiatRatesFromNetwork ? "Fiat rates updated" : "Indicative fiat rates");
+            updatedAtText.setText(fiatRatesFromNetwork ? R.string.fiat_rates_updated : R.string.indicative_fiat_rates);
         } else {
             updatedAtText.setText(lastMarketStatus != null ? lastMarketStatus : getString(R.string.updating_data));
         }
@@ -461,8 +519,8 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 favoriteCount++;
             }
         }
-        marketCountText.setText(allCurrencies.size() + (allCurrencies.size() == 1 ? " asset" : " assets"));
-        favoriteCountText.setText(favoriteCount + (favoriteCount == 1 ? " favorite" : " favorites"));
+        marketCountText.setText(getResources().getQuantityString(R.plurals.asset_count, allCurrencies.size(), allCurrencies.size()));
+        favoriteCountText.setText(getResources().getQuantityString(R.plurals.favorite_count, favoriteCount, favoriteCount));
     }
 
     private void indexCurrencies() {
@@ -521,18 +579,18 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     private void savePortfolioHolding() {
         CryptoCurrency selected = selectedPortfolioCurrency();
         if (selected == null) {
-            Snackbar.make(portfolioContent, "Prices are still loading", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(portfolioContent, R.string.prices_still_loading, Snackbar.LENGTH_SHORT).show();
             return;
         }
         Double amount = parseAmount(portfolioAmountInput);
         if (amount == null || amount <= 0.0) {
-            Snackbar.make(portfolioContent, "Enter a positive quantity", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(portfolioContent, R.string.enter_positive_quantity, Snackbar.LENGTH_SHORT).show();
             return;
         }
         sessionManager.setPortfolioHolding(selected.getSymbol(), amount);
         renderPortfolio();
         updateHeaderSubtitle();
-        Snackbar.make(portfolioContent, "Position saved", Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(portfolioContent, R.string.position_saved, Snackbar.LENGTH_SHORT).show();
     }
 
     private void removeSelectedPortfolioHolding() {
@@ -544,7 +602,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         portfolioAmountInput.setText("");
         renderPortfolio();
         updateHeaderSubtitle();
-        Snackbar.make(portfolioContent, "Position removed", Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(portfolioContent, R.string.position_removed, Snackbar.LENGTH_SHORT).show();
     }
 
     private void renderPortfolio() {
@@ -585,7 +643,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 + Formatters.price(Math.abs(totalChange))
                 + " (" + Formatters.change(totalChangePercent) + ")");
         portfolioChangeText.setTextColor(ContextCompat.getColor(this, totalChange >= 0.0 ? R.color.positive : R.color.negative));
-        portfolioPositionCountText.setText(holdings.size() + (holdings.size() == 1 ? " position" : " positions"));
+        portfolioPositionCountText.setText(getResources().getQuantityString(R.plurals.position_count, holdings.size(), holdings.size()));
         portfolioEmptyText.setVisibility(holdings.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
@@ -630,7 +688,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         TextView nameText = createPortfolioText(name, R.color.text_primary, 16, true, 1);
         TextView amountText = createPortfolioText(Formatters.quantity(amount) + " " + symbol, R.color.text_secondary, 13, false, 1);
         TextView valueText = createPortfolioText(
-                priced ? Formatters.price(valueUsd) + " - " + Formatters.change(changePercent) : "Price unavailable",
+                priced ? Formatters.price(valueUsd) + " - " + Formatters.change(changePercent) : getString(R.string.price_unavailable),
                 priced && changePercent < 0.0 ? R.color.negative : priced ? R.color.positive : R.color.text_secondary,
                 13,
                 false,
@@ -650,7 +708,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
             sessionManager.removePortfolioHolding(symbol);
             renderPortfolio();
             updateHeaderSubtitle();
-            Snackbar.make(portfolioContent, "Position removed", Snackbar.LENGTH_SHORT).show();
+            Snackbar.make(portfolioContent, R.string.position_removed, Snackbar.LENGTH_SHORT).show();
         });
         row.addView(deleteButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
@@ -772,7 +830,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         String fromCode = selectedConverterCode(converterFromSpinner);
         String toCode = selectedConverterCode(converterToSpinner);
         if (amount == null || fromCode == null || toCode == null) {
-            converterResultText.setText("Enter an amount");
+            converterResultText.setText(R.string.enter_amount);
             converterRateText.setText(getString(R.string.converter_rate));
             return;
         }
@@ -783,14 +841,18 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         Double rate = rateUsd != null ? usdToCode(rateUsd, toCode) : null;
 
         if (converted == null || rate == null) {
-            converterResultText.setText("Rate unavailable");
-            converterRateText.setText("Crypto prices are still loading");
+            converterResultText.setText(R.string.rate_unavailable);
+            converterRateText.setText(R.string.crypto_prices_loading);
             return;
         }
 
         converterResultText.setText(formatConverted(converted, toCode));
-        converterRateText.setText("1 " + fromCode + " = " + formatConverted(rate, toCode)
-                + " - " + (fiatRatesFromNetwork ? "rates updated" : "indicative rate"));
+        converterRateText.setText(getString(
+                R.string.converter_rate_format,
+                fromCode,
+                formatConverted(rate, toCode),
+                getString(fiatRatesFromNetwork ? R.string.rates_updated_suffix : R.string.indicative_rate_suffix)
+        ));
     }
 
     private String selectedConverterCode(Spinner spinner) {
@@ -907,20 +969,20 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     private String fiatDisplayName(String code) {
         switch (code) {
             case "EUR":
-                return "Euro";
+                return getString(R.string.fiat_euro);
             case "GBP":
-                return "British pound";
+                return getString(R.string.fiat_british_pound);
             case "JPY":
-                return "Japanese yen";
+                return getString(R.string.fiat_japanese_yen);
             case "CHF":
-                return "Swiss franc";
+                return getString(R.string.fiat_swiss_franc);
             case "CAD":
-                return "Canadian dollar";
+                return getString(R.string.fiat_canadian_dollar);
             case "AUD":
-                return "Australian dollar";
+                return getString(R.string.fiat_australian_dollar);
             case "USD":
             default:
-                return "US dollar";
+                return getString(R.string.fiat_us_dollar);
         }
     }
 
@@ -954,7 +1016,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
             }
         });
         filterAndRender();
-        Snackbar.make(emptyText, favorite ? "Added to favorites" : "Removed from favorites", Snackbar.LENGTH_SHORT).show();
+        Snackbar.make(emptyText, favorite ? R.string.added_to_favorites : R.string.removed_from_favorites, Snackbar.LENGTH_SHORT).show();
     }
 
     @Override
@@ -966,6 +1028,6 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
         sessionManager.setNotificationsEnabled(granted);
         notificationSwitch.setChecked(granted);
-        Snackbar.make(notificationSwitch, granted ? "Notifications enabled" : "Notification permission denied", Snackbar.LENGTH_LONG).show();
+        Snackbar.make(notificationSwitch, granted ? R.string.notifications_enabled : R.string.notification_permission_denied, Snackbar.LENGTH_LONG).show();
     }
 }

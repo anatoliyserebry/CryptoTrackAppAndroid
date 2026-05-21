@@ -17,6 +17,7 @@ public class SessionManager {
     private static final String KEY_API_SOURCE = "api_source";
     private static final String KEY_PORTFOLIO = "portfolio_holdings";
     private static final String KEY_PRICE_ALERTS = "price_alerts";
+    private static final String KEY_LANGUAGE = "language_code";
 
     private final SharedPreferences preferences;
 
@@ -69,6 +70,21 @@ public class SessionManager {
 
     public void setApiSource(ApiSource source) {
         preferences.edit().putString(KEY_API_SOURCE, source != null ? source.getKey() : ApiSource.AUTO.getKey()).apply();
+    }
+
+    public String getLanguageCode() {
+        String languageCode = preferences.getString(KEY_LANGUAGE, "en");
+        if ("fr".equals(languageCode) || "ru".equals(languageCode) || "en".equals(languageCode)) {
+            return languageCode;
+        }
+        return "en";
+    }
+
+    public void setLanguageCode(String languageCode) {
+        String cleanCode = "fr".equals(languageCode) || "ru".equals(languageCode) || "en".equals(languageCode)
+                ? languageCode
+                : "en";
+        preferences.edit().putString(KEY_LANGUAGE, cleanCode).apply();
     }
 
     public Map<String, Double> getPortfolioHoldings() {

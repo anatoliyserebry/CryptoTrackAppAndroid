@@ -31,10 +31,10 @@ public final class NotificationHelper {
         }
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "CryptoTrack market alerts",
+                context.getString(R.string.notification_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
         );
-        channel.setDescription("Significant cryptocurrency price movements and target price alerts");
+        channel.setDescription(context.getString(R.string.notification_channel_description));
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager != null) {
             manager.createNotificationChannel(channel);
@@ -61,7 +61,7 @@ public final class NotificationHelper {
         );
 
         String title = currency.getSymbol() + " " + Formatters.change(movePercent);
-        String text = currency.getName() + " is now " + Formatters.price(currency.getPriceUsd());
+        String text = context.getString(R.string.notification_market_text_format, currency.getName(), Formatters.price(currency.getPriceUsd()));
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_bell_24)
                 .setContentTitle(title)
@@ -87,9 +87,9 @@ public final class NotificationHelper {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        String direction = alert.isTriggerAbove() ? "reached" : "fell to";
-        String title = alert.getSymbol() + " target " + Formatters.price(alert.getTargetPriceUsd());
-        String text = currency.getName() + " " + direction + " " + Formatters.price(currency.getPriceUsd());
+        String direction = context.getString(alert.isTriggerAbove() ? R.string.notification_direction_reached : R.string.notification_direction_fell_to);
+        String title = context.getString(R.string.notification_price_alert_title, alert.getSymbol(), Formatters.price(alert.getTargetPriceUsd()));
+        String text = context.getString(R.string.notification_price_alert_text, currency.getName(), direction, Formatters.price(currency.getPriceUsd()));
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_bell_24)
                 .setContentTitle(title)

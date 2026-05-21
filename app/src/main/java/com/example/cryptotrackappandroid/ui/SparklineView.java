@@ -361,9 +361,9 @@ public class SparklineView extends View {
 
     private String formatTimestamp(long timestamp) {
         if (timestamps.length > 1 && timestamps[timestamps.length - 1] - timestamps[0] <= 2L * 24L * 60L * 60L * 1000L) {
-            return new SimpleDateFormat("HH:mm", Locale.US).format(new Date(timestamp));
+            return new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date(timestamp));
         }
-        return new SimpleDateFormat("dd MMM HH:mm", Locale.US).format(new Date(timestamp));
+        return new SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()).format(new Date(timestamp));
     }
 
     private int alphaColor(int color, int alpha) {
