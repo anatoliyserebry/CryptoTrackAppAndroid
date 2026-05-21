@@ -16,6 +16,7 @@ public class SessionManager {
     private static final String KEY_NOTIFICATIONS = "notifications_enabled";
     private static final String KEY_API_SOURCE = "api_source";
     private static final String KEY_PORTFOLIO = "portfolio_holdings";
+    private static final String KEY_PRICE_ALERTS = "price_alerts";
 
     private final SharedPreferences preferences;
 
@@ -114,6 +115,58 @@ public class SessionManager {
         setPortfolioHolding(symbol, 0.0);
     }
 
+    public Map<String, PriceAlert> getPriceAlerts() {
+        Set<String> entries = preferences.getStringSet(KEY_PRICE_ALERTS, new HashSet<>());
+        Map<String, PriceAlert> alerts = new LinkedHashMap<>();
+        for (String entry : entries) {
+            PriceAlert alert = parsePriceAlert(entry);
+            if (alert != null) {
+                alerts.put(alert.getSymbol(), alert);
+            }
+        }
+        return alerts;
+    }
+
+    public PriceAlert getPriceAlert(String symbol) {
+        return getPriceAlerts().get(normalizeSymbol(symbol));
+    }
+
+    public void setPriceAlert(String symbol, double targetPriceUsd, boolean triggerAbove) {
+        String cleanSymbol = normalizeSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return;
+        }
+        if (targetPriceUsd <= 0.0) {
+            removePriceAlert(cleanSymbol);
+            return;
+        }
+        Map<String, PriceAlert> alerts = getPriceAlerts();
+        alerts.put(cleanSymbol, new PriceAlert(cleanSymbol, targetPriceUsd, triggerAbove, false));
+        savePriceAlerts(alerts);
+    }
+
+    public void setPriceAlertTriggered(String symbol, boolean triggered) {
+        String cleanSymbol = normalizeSymbol(symbol);
+        Map<String, PriceAlert> alerts = getPriceAlerts();
+        PriceAlert alert = alerts.get(cleanSymbol);
+        if (alert == null) {
+            return;
+        }
+        alerts.put(cleanSymbol, new PriceAlert(
+                cleanSymbol,
+                alert.getTargetPriceUsd(),
+                alert.isTriggerAbove(),
+                triggered
+        ));
+        savePriceAlerts(alerts);
+    }
+
+    public void removePriceAlert(String symbol) {
+        Map<String, PriceAlert> alerts = getPriceAlerts();
+        alerts.remove(normalizeSymbol(symbol));
+        savePriceAlerts(alerts);
+    }
+
     private void savePortfolioHoldings(Map<String, Double> holdings) {
         Set<String> entries = new HashSet<>();
         for (Map.Entry<String, Double> entry : holdings.entrySet()) {
@@ -122,6 +175,45 @@ public class SessionManager {
             }
         }
         preferences.edit().putStringSet(KEY_PORTFOLIO, entries).apply();
+    }
+
+    private PriceAlert parsePriceAlert(String entry) {
+        if (entry == null) {
+            return null;
+        }
+        String[] parts = entry.split(":", 4);
+        if (parts.length != 4) {
+            return null;
+        }
+        String symbol = normalizeSymbol(parts[0]);
+        if (symbol.isEmpty()) {
+            return null;
+        }
+        try {
+            double targetPriceUsd = Double.parseDouble(parts[1]);
+            if (targetPriceUsd <= 0.0) {
+                return null;
+            }
+            boolean triggerAbove = Boolean.parseBoolean(parts[2]);
+            boolean triggered = Boolean.parseBoolean(parts[3]);
+            return new PriceAlert(symbol, targetPriceUsd, triggerAbove, triggered);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private void savePriceAlerts(Map<String, PriceAlert> alerts) {
+        Set<String> entries = new HashSet<>();
+        for (PriceAlert alert : alerts.values()) {
+            if (alert == null || alert.getSymbol() == null || alert.getTargetPriceUsd() <= 0.0) {
+                continue;
+            }
+            entries.add(normalizeSymbol(alert.getSymbol())
+                    + ":" + alert.getTargetPriceUsd()
+                    + ":" + alert.isTriggerAbove()
+                    + ":" + alert.isTriggered());
+        }
+        preferences.edit().putStringSet(KEY_PRICE_ALERTS, entries).apply();
     }
 
     private String normalizeSymbol(String symbol) {

@@ -32,6 +32,7 @@ import com.example.cryptotrackappandroid.data.ApiCallback;
 import com.example.cryptotrackappandroid.data.ApiClient;
 import com.example.cryptotrackappandroid.data.ApiSource;
 import com.example.cryptotrackappandroid.data.CryptoCurrency;
+import com.example.cryptotrackappandroid.data.PriceAlert;
 import com.example.cryptotrackappandroid.data.SessionManager;
 import com.example.cryptotrackappandroid.notifications.NotificationHelper;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -132,6 +133,9 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     @Override
     protected void onResume() {
         super.onResume();
+        if (notificationSwitch != null) {
+            notificationSwitch.setChecked(sessionManager.areNotificationsEnabled());
+        }
         if (!allCurrencies.isEmpty()) {
             applyFavorites(allCurrencies);
             indexCurrencies();
@@ -352,6 +356,7 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
 
     private void maybeNotifyMarketMoves(List<CryptoCurrency> currencies) {
         boolean enabled = sessionManager.areNotificationsEnabled() && NotificationHelper.canPostNotifications(this);
+        Map<String, PriceAlert> priceAlerts = sessionManager.getPriceAlerts();
         for (CryptoCurrency currency : currencies) {
             Double oldPrice = lastPrices.get(currency.getId());
             double newPrice = currency.getPriceUsd();
@@ -361,8 +366,38 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                     NotificationHelper.showMarketMove(this, currency, movePercent);
                 }
             }
+            maybeNotifyPriceAlert(enabled, priceAlerts, currency, oldPrice, newPrice);
             lastPrices.put(currency.getId(), newPrice);
         }
+    }
+
+    private void maybeNotifyPriceAlert(
+            boolean enabled,
+            Map<String, PriceAlert> priceAlerts,
+            CryptoCurrency currency,
+            Double oldPrice,
+            double newPrice
+    ) {
+        if (!enabled || newPrice <= 0.0) {
+            return;
+        }
+
+        String symbol = normalizeSymbol(currency.getSymbol());
+        PriceAlert alert = priceAlerts.get(symbol);
+        if (alert == null || alert.isTriggered()) {
+            return;
+        }
+
+        double target = alert.getTargetPriceUsd();
+        boolean reached = alert.isTriggerAbove()
+                ? newPrice >= target && (oldPrice == null || oldPrice < target)
+                : newPrice <= target && (oldPrice == null || oldPrice > target);
+        if (!reached) {
+            return;
+        }
+
+        NotificationHelper.showPriceAlert(this, currency, alert);
+        sessionManager.setPriceAlertTriggered(symbol, true);
     }
 
     private void filterAndRender() {

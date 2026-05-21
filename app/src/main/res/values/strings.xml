@@ -39,4 +39,8 @@
     <string name="converter_result">Result</string>
     <string name="converter_rate">Indicative rate</string>
     <string name="swap_currencies">Swap</string>
+    <string name="price_alert">Price alert</string>
+    <string name="price_alert_target">Target price in USD</string>
+    <string name="save_alert">Save alert</string>
+    <string name="remove_alert">Remove alert</string>
 </resources>
