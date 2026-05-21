@@ -164,6 +164,8 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
+                            android:ellipsize="end"
+                            android:maxLines="1"
                             android:text="@string/data_source"
                             android:textColor="@color/text_secondary"
                             android:textSize="13sp" />
@@ -192,6 +194,8 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
+                            android:ellipsize="end"
+                            android:maxLines="1"
                             android:text="@string/language"
                             android:textColor="@color/text_secondary"
                             android:textSize="13sp" />
@@ -317,8 +321,10 @@
                                 android:padding="14dp">
 
                                 <TextView
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
                                     android:text="@string/portfolio_24h"
                                     android:textColor="@color/text_secondary"
                                     android:textSize="12sp" />
@@ -349,8 +355,10 @@
                                 android:padding="14dp">
 
                                 <TextView
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
                                     android:text="@string/portfolio_positions"
                                     android:textColor="@color/text_secondary"
                                     android:textSize="12sp" />
@@ -448,6 +456,12 @@
                                 android:layout_height="48dp"
                                 android:layout_marginEnd="7dp"
                                 android:layout_weight="1"
+                                android:autoSizeMaxTextSize="14sp"
+                                android:autoSizeMinTextSize="11sp"
+                                android:autoSizeStepGranularity="1sp"
+                                android:autoSizeTextType="uniform"
+                                android:ellipsize="end"
+                                android:maxLines="1"
                                 android:text="@string/save_position" />
 
                             <com.google.android.material.button.MaterialButton
@@ -457,6 +471,12 @@
                                 android:layout_height="48dp"
                                 android:layout_marginStart="7dp"
                                 android:layout_weight="1"
+                                android:autoSizeMaxTextSize="14sp"
+                                android:autoSizeMinTextSize="11sp"
+                                android:autoSizeStepGranularity="1sp"
+                                android:autoSizeTextType="uniform"
+                                android:ellipsize="end"
+                                android:maxLines="1"
                                 android:text="@string/remove_position" />
                         </LinearLayout>
                     </LinearLayout>
@@ -639,6 +659,8 @@
         app:itemIconTint="@color/bottom_nav_item"
         app:itemRippleColor="@color/surface_soft"
         app:itemTextColor="@color/bottom_nav_item"
+        app:itemTextAppearanceActive="@style/TextAppearance.CryptoTrack.BottomNav"
+        app:itemTextAppearanceInactive="@style/TextAppearance.CryptoTrack.BottomNav"
         app:labelVisibilityMode="labeled"
         app:menu="@menu/bottom_nav_menu" />
 </LinearLayout>
