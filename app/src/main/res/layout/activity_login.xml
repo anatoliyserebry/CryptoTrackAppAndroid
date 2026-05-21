@@ -11,11 +11,14 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:paddingStart="24dp"
+        android:paddingTop="28dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="24dp">
 
         <Space
             android:layout_width="1dp"
-            android:layout_height="50dp" />
+            android:layout_height="34dp" />
 
         <TextView
             android:layout_width="78dp"
@@ -34,7 +37,7 @@
             android:fontFamily="sans-serif-medium"
             android:text="@string/app_name"
             android:textColor="@color/text_primary"
-            android:textSize="34sp" />
+            android:textSize="33sp" />
 
         <TextView
             android:layout_width="match_parent"
@@ -52,9 +55,9 @@
             android:layout_marginTop="32dp"
             app:cardBackgroundColor="@color/surface"
             app:cardCornerRadius="8dp"
-            app:cardElevation="4dp"
+            app:cardElevation="1dp"
             app:strokeColor="@color/divider"
-            app:strokeWidth="0dp">
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -85,6 +88,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="20dp"
                     android:hint="@string/email"
+                    app:boxBackgroundColor="@color/field_background"
                     app:boxCornerRadiusBottomEnd="8dp"
                     app:boxCornerRadiusBottomStart="8dp"
                     app:boxCornerRadiusTopEnd="8dp"
@@ -108,6 +112,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
                     android:hint="@string/password"
+                    app:boxBackgroundColor="@color/field_background"
                     app:boxCornerRadiusBottomEnd="8dp"
                     app:boxCornerRadiusBottomStart="8dp"
                     app:boxCornerRadiusTopEnd="8dp"
