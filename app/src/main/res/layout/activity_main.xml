@@ -38,9 +38,11 @@
 
                 <TextView
                     android:id="@+id/updatedAtText"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="@string/updating_data"
                     android:textColor="#C9F7F1"
                     android:textSize="13sp" />
@@ -258,7 +260,12 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
+                            android:autoSizeMaxTextSize="34sp"
+                            android:autoSizeMinTextSize="22sp"
+                            android:autoSizeStepGranularity="1sp"
+                            android:autoSizeTextType="uniform"
                             android:fontFamily="sans-serif-medium"
+                            android:maxLines="1"
                             android:text="$0.00"
                             android:textColor="@color/text_primary"
                             android:textSize="34sp" />
@@ -287,10 +294,15 @@
 
                                 <TextView
                                     android:id="@+id/portfolioChangeText"
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="6dp"
+                                    android:autoSizeMaxTextSize="16sp"
+                                    android:autoSizeMinTextSize="12sp"
+                                    android:autoSizeStepGranularity="1sp"
+                                    android:autoSizeTextType="uniform"
                                     android:fontFamily="sans-serif-medium"
+                                    android:maxLines="2"
                                     android:text="$0.00"
                                     android:textColor="@color/text_primary"
                                     android:textSize="16sp" />
@@ -314,10 +326,15 @@
 
                                 <TextView
                                     android:id="@+id/portfolioPositionCountText"
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="6dp"
+                                    android:autoSizeMaxTextSize="16sp"
+                                    android:autoSizeMinTextSize="12sp"
+                                    android:autoSizeStepGranularity="1sp"
+                                    android:autoSizeTextType="uniform"
                                     android:fontFamily="sans-serif-medium"
+                                    android:maxLines="2"
                                     android:text="0"
                                     android:textColor="@color/text_primary"
                                     android:textSize="16sp" />
@@ -552,7 +569,12 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="8dp"
+                                android:autoSizeMaxTextSize="28sp"
+                                android:autoSizeMinTextSize="18sp"
+                                android:autoSizeStepGranularity="1sp"
+                                android:autoSizeTextType="uniform"
                                 android:fontFamily="sans-serif-medium"
+                                android:maxLines="2"
                                 android:text="$0.00"
                                 android:textColor="@color/text_primary"
                                 android:textSize="28sp" />
@@ -562,6 +584,7 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
+                                android:maxLines="3"
                                 android:text="@string/converter_rate"
                                 android:textColor="@color/text_secondary"
                                 android:textSize="13sp" />

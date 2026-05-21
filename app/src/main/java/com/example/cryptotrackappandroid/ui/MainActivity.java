@@ -256,10 +256,10 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
     private void setupApiSourceSpinner() {
         ArrayAdapter<String> sourceAdapter = new ArrayAdapter<>(
                 this,
-                android.R.layout.simple_spinner_item,
+                R.layout.item_spinner_selected,
                 ApiSource.displayNames()
         );
-        sourceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        sourceAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         apiSourceSpinner.setAdapter(sourceAdapter);
         apiSourceSpinner.setSelection(currentApiSource.ordinal(), false);
         apiSourceSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -453,8 +453,8 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
             labels.add(getString(R.string.loading_market_data));
         }
 
-        ArrayAdapter<String> portfolioAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, labels);
-        portfolioAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> portfolioAdapter = new ArrayAdapter<>(this, R.layout.item_spinner_selected, labels);
+        portfolioAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         portfolioCryptoSpinner.setAdapter(portfolioAdapter);
 
         int selection = 0;
@@ -592,13 +592,14 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
                 1
         );
 
-        TextView nameText = createPortfolioText(name, R.color.text_primary, 16, true);
-        TextView amountText = createPortfolioText(Formatters.quantity(amount) + " " + symbol, R.color.text_secondary, 13, false);
+        TextView nameText = createPortfolioText(name, R.color.text_primary, 16, true, 1);
+        TextView amountText = createPortfolioText(Formatters.quantity(amount) + " " + symbol, R.color.text_secondary, 13, false, 1);
         TextView valueText = createPortfolioText(
                 priced ? Formatters.price(valueUsd) + " - " + Formatters.change(changePercent) : "Price unavailable",
                 priced && changePercent < 0.0 ? R.color.negative : priced ? R.color.positive : R.color.text_secondary,
                 13,
-                false
+                false,
+                2
         );
 
         details.addView(nameText);
@@ -622,12 +623,17 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         portfolioHoldingList.addView(row, rowParams);
     }
 
-    private TextView createPortfolioText(String text, int colorRes, int sizeSp, boolean bold) {
+    private TextView createPortfolioText(String text, int colorRes, int sizeSp, boolean bold, int maxLines) {
         TextView textView = new TextView(this);
         textView.setText(text);
         textView.setTextColor(ContextCompat.getColor(this, colorRes));
         textView.setTextSize(sizeSp);
-        textView.setSingleLine(true);
+        if (maxLines == 1) {
+            textView.setSingleLine(true);
+        } else {
+            textView.setSingleLine(false);
+            textView.setMaxLines(maxLines);
+        }
         textView.setEllipsize(TextUtils.TruncateAt.END);
         if (bold) {
             textView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -686,8 +692,8 @@ public class MainActivity extends AppCompatActivity implements CryptoAdapter.Lis
         converterOptionCodes.clear();
         converterOptionCodes.addAll(codes);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, labels);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.item_spinner_selected, labels);
+        adapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
 
         refreshingConverterOptions = true;
         converterFromSpinner.setAdapter(adapter);
